@@ -1,3 +1,7 @@
+/*
+* dark.c - Dark Caverns Main Game Loop
+*/
+
 #include <SDL2/SDL.h>
 
 #define SCREEN_WIDTH	1280
@@ -24,13 +28,22 @@ typedef int64_t		i64;
 #include "pt_console.c"
 
 
+typedef struct {
+	u8 pos_x;
+	u8 pos_y;
+} Player;
+
+
+global_variable Player player;
+
+
 void render_screen(SDL_Renderer *renderer, 
 				   SDL_Texture *screen, 
 				   PT_Console *console) {
 
 	PT_ConsoleClear(console);
 
-	PT_ConsolePutCharAt(console, '@', 10, 10, 0xFFFFFFFF, 0x000000FF);
+	PT_ConsolePutCharAt(console, '@', player.pos_x, player.pos_y, 0xFFFFFFFF, 0x000000FF);
 
 	SDL_UpdateTexture(screen, NULL, console->pixels, SCREEN_WIDTH * sizeof(u32));
 	SDL_RenderClear(renderer);
@@ -60,6 +73,11 @@ int main() {
 
 	PT_ConsoleSetBitmapFont(console, "./terminal16x16.png", 0, 16, 16);
 
+
+	player.pos_x = 25;
+	player.pos_y = 25;
+
+
 	bool done = false;
 	while (!done) {
 
@@ -71,6 +89,36 @@ int main() {
 				break;
 			}
 
+			if (event.type == SDL_KEYDOWN) {
+				SDL_Keycode key = event.key.keysym.sym;
+				switch (key) {
+					case SDLK_ESCAPE:
+						done = true;
+						break;
+					case SDLK_UP:
+						if (player.pos_y > 0) {
+							player.pos_y -= 1;
+						}
+						break;
+					case SDLK_DOWN:
+						if (player.pos_y < NUM_ROWS - 1) {
+							player.pos_y += 1;
+						}
+						break;
+					case SDLK_LEFT:
+						if (player.pos_x > 0) {
+							player.pos_x -= 1;
+						}
+						break;
+					case SDLK_RIGHT:
+						if (player.pos_x < NUM_COLS - 1) {
+							player.pos_x += 1;
+						}
+						break;
+					default:
+						break;
+				}
+			}
 		}
 
 		render_screen(renderer, screen, console);
