@@ -2,6 +2,8 @@
 * dark.c - Dark Caverns Main Game Loop
 */
 
+#include "assert.h"
+
 #include <SDL2/SDL.h>
 
 #define SCREEN_WIDTH	1280
@@ -26,24 +28,22 @@ typedef int64_t		i64;
 
 
 #include "pt_console.c"
+#include "game.c"
 
 
-typedef struct {
-	u8 pos_x;
-	u8 pos_y;
-} Player;
-
-
-global_variable Player player;
-
-
-void render_screen(SDL_Renderer *renderer, 
-				   SDL_Texture *screen, 
-				   PT_Console *console) {
+void renderScreen(SDL_Renderer *renderer, 
+				  SDL_Texture *screen, 
+				  PT_Console *console) {
 
 	PT_ConsoleClear(console);
 
-	PT_ConsolePutCharAt(console, '@', player.pos_x, player.pos_y, 0xFFFFFFFF, 0x000000FF);
+	for (u32 i = 1; i < MAX_GO; i++) {
+		if (visibilityComps[i].objectId > 0) {
+			Position *p = (Position *)getComponentForGameObject(&gameObjects[i], COMP_POSITION);
+			PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
+								visibilityComps[i].fgColor, visibilityComps[i].bgColor);
+		}
+	}
 
 	SDL_UpdateTexture(screen, NULL, console->pixels, SCREEN_WIDTH * sizeof(u32));
 	SDL_RenderClear(renderer);
@@ -74,12 +74,26 @@ int main() {
 	PT_ConsoleSetBitmapFont(console, "./terminal16x16.png", 0, 16, 16);
 
 
-	player.pos_x = 25;
-	player.pos_y = 25;
+	GameObject *player = createGameObject();
+	Position pos = {player->id, 25, 25};
+	addComponentToGameObject(player, COMP_POSITION, &pos);
+	Visibility vis = {player->id, '@', 0x00FF00FF, 0x000000FF};
+	addComponentToGameObject(player, COMP_VISIBILITY, &vis);
+
+	GameObject *wall = createGameObject();
+	Position wallPos = {wall->id, 30, 25};
+	addComponentToGameObject(wall, COMP_POSITION, &wallPos);
+	Visibility wallVis = {wall->id, '#', 0xFFFFFFFF, 0x000000FF};
+	addComponentToGameObject(wall, COMP_VISIBILITY, &wallVis);
 
 
 	bool done = false;
 	while (!done) {
+
+		// DEBUG
+		Position pos = {player->id, 25, 25};
+		addComponentToGameObject(player, COMP_POSITION, &pos);
+		// END DEBUG
 
 		SDL_Event event;
 		while (SDL_PollEvent(&event) != 0) {
@@ -91,28 +105,31 @@ int main() {
 
 			if (event.type == SDL_KEYDOWN) {
 				SDL_Keycode key = event.key.keysym.sym;
+
+				Position *playerPos = (Position *)getComponentForGameObject(player, COMP_POSITION);
+
 				switch (key) {
 					case SDLK_ESCAPE:
 						done = true;
 						break;
 					case SDLK_UP:
-						if (player.pos_y > 0) {
-							player.pos_y -= 1;
+						if (playerPos->y > 0) {
+							playerPos->y -= 1;
 						}
 						break;
 					case SDLK_DOWN:
-						if (player.pos_y < NUM_ROWS - 1) {
-							player.pos_y += 1;
+						if (playerPos->y < NUM_ROWS - 1) {
+							playerPos->y += 1;
 						}
 						break;
 					case SDLK_LEFT:
-						if (player.pos_x > 0) {
-							player.pos_x -= 1;
+						if (playerPos->x > 0) {
+							playerPos->x -= 1;
 						}
 						break;
 					case SDLK_RIGHT:
-						if (player.pos_x < NUM_COLS - 1) {
-							player.pos_x += 1;
+						if (playerPos->x < NUM_COLS - 1) {
+							playerPos->x += 1;
 						}
 						break;
 					default:
@@ -121,7 +138,7 @@ int main() {
 			}
 		}
 
-		render_screen(renderer, screen, console);
+		renderScreen(renderer, screen, console);
 	}
 
 	SDL_DestroyRenderer(renderer);
