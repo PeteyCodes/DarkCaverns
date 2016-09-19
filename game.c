@@ -47,6 +47,7 @@ typedef struct {
 global_variable GameObject gameObjects[MAX_GO];
 global_variable Position positionComps[MAX_GO];
 global_variable Visibility visibilityComps[MAX_GO];
+global_variable Physical physicalComps[MAX_GO];
 
 
 /* Game Object Management */
@@ -83,7 +84,7 @@ void addComponentToGameObject(GameObject *obj,
 			pos->x = posData->x;
 			pos->y = posData->y;
 
-			obj->components[comp] = &pos;
+			obj->components[comp] = pos;
 
 			break;
 
@@ -95,7 +96,18 @@ void addComponentToGameObject(GameObject *obj,
 			vis->fgColor = visData->fgColor;
 			vis->bgColor = visData->bgColor;
 
-			obj->components[comp] = &vis;
+			obj->components[comp] = vis;
+
+			break;
+
+		case COMP_PHYSICAL:
+			Physical *phys = &physicalComps[obj->id];
+			Physical *physData = (Physical *)compData;
+			phys->objectId = obj->id;
+			phys->blocksSight = physData->blocksSight;
+			phys->blocksMovement = physData->blocksMovement;
+
+			obj->components[comp] = phys;
 
 			break;
 
@@ -108,6 +120,7 @@ void addComponentToGameObject(GameObject *obj,
 void destroyGameObject(GameObject *obj) {
 	positionComps[obj->id].objectId = 0;
 	visibilityComps[obj->id].objectId = 0;
+	physicalComps[obj->id].objectId = 0;
 	// TODO: Clean up other components used by this object
 
 	obj->id = 0;

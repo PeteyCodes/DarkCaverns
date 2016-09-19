@@ -31,6 +31,26 @@ typedef int64_t		i64;
 #include "game.c"
 
 
+bool canMove(Position pos) {
+	bool moveAllowed = true;
+
+	if ((pos.x >= 0) && (pos.x < NUM_COLS) && (pos.y >= 0) && (pos.y < NUM_ROWS)) {
+		for (u32 i = 1; i < MAX_GO; i++) {
+			Position p = positionComps[i];
+			if ((p.objectId > 0) && (p.x == pos.x) && (p.y == pos.y)) {
+				if (physicalComps[i].blocksMovement == true) {
+					moveAllowed = false;
+				}
+			}
+		}
+
+	} else {
+		moveAllowed = false;
+	}
+
+	return moveAllowed;
+}
+
 void renderScreen(SDL_Renderer *renderer, 
 				  SDL_Texture *screen, 
 				  PT_Console *console) {
@@ -79,21 +99,20 @@ int main() {
 	addComponentToGameObject(player, COMP_POSITION, &pos);
 	Visibility vis = {player->id, '@', 0x00FF00FF, 0x000000FF};
 	addComponentToGameObject(player, COMP_VISIBILITY, &vis);
+	Physical phys = {player->id, true, true};
+	addComponentToGameObject(player, COMP_PHYSICAL, &phys);
 
 	GameObject *wall = createGameObject();
 	Position wallPos = {wall->id, 30, 25};
 	addComponentToGameObject(wall, COMP_POSITION, &wallPos);
 	Visibility wallVis = {wall->id, '#', 0xFFFFFFFF, 0x000000FF};
 	addComponentToGameObject(wall, COMP_VISIBILITY, &wallVis);
+	Physical wallPhys = {wall->id, true, true};
+	addComponentToGameObject(wall, COMP_PHYSICAL, &wallPhys);
 
 
 	bool done = false;
 	while (!done) {
-
-		// DEBUG
-		Position pos = {player->id, 25, 25};
-		addComponentToGameObject(player, COMP_POSITION, &pos);
-		// END DEBUG
 
 		SDL_Event event;
 		while (SDL_PollEvent(&event) != 0) {
@@ -112,26 +131,39 @@ int main() {
 					case SDLK_ESCAPE:
 						done = true;
 						break;
-					case SDLK_UP:
-						if (playerPos->y > 0) {
-							playerPos->y -= 1;
+
+					case SDLK_UP: {
+						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1};
+						if (canMove(newPos)) {
+							addComponentToGameObject(player, COMP_POSITION, &newPos);							
 						}
-						break;
-					case SDLK_DOWN:
-						if (playerPos->y < NUM_ROWS - 1) {
-							playerPos->y += 1;
+					}
+					break;
+
+					case SDLK_DOWN: {
+						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1};
+						if (canMove(newPos)) {
+							addComponentToGameObject(player, COMP_POSITION, &newPos);							
 						}
-						break;
-					case SDLK_LEFT:
-						if (playerPos->x > 0) {
-							playerPos->x -= 1;
+					}
+					break;
+
+					case SDLK_LEFT: {
+						Position newPos = {playerPos->objectId, playerPos->x - 1, playerPos->y};
+						if (canMove(newPos)) {
+							addComponentToGameObject(player, COMP_POSITION, &newPos);							
 						}
-						break;
-					case SDLK_RIGHT:
-						if (playerPos->x < NUM_COLS - 1) {
-							playerPos->x += 1;
+					}
+					break;
+
+					case SDLK_RIGHT: {
+						Position newPos = {playerPos->objectId, playerPos->x + 1, playerPos->y};
+						if (canMove(newPos)) {
+							addComponentToGameObject(player, COMP_POSITION, &newPos);							
 						}
-						break;
+					}
+					break;
+
 					default:
 						break;
 				}
