@@ -2,7 +2,8 @@
 * dark.c - Dark Caverns Main Game Loop
 */
 
-#include "assert.h"
+#include <assert.h>
+#include <stdlib.h>
 
 #include <SDL2/SDL.h>
 
@@ -31,13 +32,13 @@ typedef int64_t		i64;
 #include "game.c"
 
 
-bool canMove(Position pos) {
+bool can_move(Position pos) {
 	bool moveAllowed = true;
 
 	if ((pos.x >= 0) && (pos.x < NUM_COLS) && (pos.y >= 0) && (pos.y < NUM_ROWS)) {
-		for (u32 i = 1; i < MAX_GO; i++) {
+		for (u32 i = 0; i < MAX_GO; i++) {
 			Position p = positionComps[i];
-			if ((p.objectId > 0) && (p.x == pos.x) && (p.y == pos.y)) {
+			if ((p.objectId != UNUSED) && (p.x == pos.x) && (p.y == pos.y)) {
 				if (physicalComps[i].blocksMovement == true) {
 					moveAllowed = false;
 				}
@@ -51,15 +52,15 @@ bool canMove(Position pos) {
 	return moveAllowed;
 }
 
-void renderScreen(SDL_Renderer *renderer, 
+void render_screen(SDL_Renderer *renderer, 
 				  SDL_Texture *screen, 
 				  PT_Console *console) {
 
 	PT_ConsoleClear(console);
 
-	for (u32 i = 1; i < MAX_GO; i++) {
-		if (visibilityComps[i].objectId > 0) {
-			Position *p = (Position *)getComponentForGameObject(&gameObjects[i], COMP_POSITION);
+	for (u32 i = 0; i < MAX_GO; i++) {
+		if (visibilityComps[i].objectId != UNUSED) {
+			Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
 			PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
 								visibilityComps[i].fgColor, visibilityComps[i].bgColor);
 		}
@@ -72,6 +73,8 @@ void renderScreen(SDL_Renderer *renderer,
 }
 
 int main() {
+
+	srand((unsigned)time(NULL));
 
 	SDL_Init(SDL_INIT_VIDEO);
 
@@ -94,21 +97,33 @@ int main() {
 	PT_ConsoleSetBitmapFont(console, "./terminal16x16.png", 0, 16, 16);
 
 
-	GameObject *player = createGameObject();
-	Position pos = {player->id, 25, 25};
-	addComponentToGameObject(player, COMP_POSITION, &pos);
-	Visibility vis = {player->id, '@', 0x00FF00FF, 0x000000FF};
-	addComponentToGameObject(player, COMP_VISIBILITY, &vis);
-	Physical phys = {player->id, true, true};
-	addComponentToGameObject(player, COMP_PHYSICAL, &phys);
+	world_state_init();
 
-	GameObject *wall = createGameObject();
-	Position wallPos = {wall->id, 30, 25};
-	addComponentToGameObject(wall, COMP_POSITION, &wallPos);
-	Visibility wallVis = {wall->id, '#', 0xFFFFFFFF, 0x000000FF};
-	addComponentToGameObject(wall, COMP_VISIBILITY, &wallVis);
-	Physical wallPhys = {wall->id, true, true};
-	addComponentToGameObject(wall, COMP_PHYSICAL, &wallPhys);
+	GameObject *player = game_object_create();
+	Position pos = {player->id, 25, 25};
+	game_object_add_component(player, COMP_POSITION, &pos);
+	Visibility vis = {player->id, '@', 0x00FF00FF, 0x000000FF};
+	game_object_add_component(player, COMP_VISIBILITY, &vis);
+	Physical phys = {player->id, true, true};
+	game_object_add_component(player, COMP_PHYSICAL, &phys);
+
+	// GameObject *wall = game_object_create();
+	// Position wallPos = {wall->id, 30, 25};
+	// game_object_add_component(wall, COMP_POSITION, &wallPos);
+	// Visibility wallVis = {wall->id, '#', 0xFFFFFFFF, 0x000000FF};
+	// game_object_add_component(wall, COMP_VISIBILITY, &wallVis);
+	// Physical wallPhys = {wall->id, true, true};
+	// game_object_add_component(wall, COMP_PHYSICAL, &wallPhys);
+
+
+	map_generate();
+	for (u32 x = 0; x < MAP_WIDTH; x++) {
+		for (u32 y = 0; y < MAP_HEIGHT; y++) {
+			if (mapCells[x][y]) {
+				wall_add(x, y);
+			}
+		}
+	}
 
 
 	bool done = false;
@@ -125,7 +140,7 @@ int main() {
 			if (event.type == SDL_KEYDOWN) {
 				SDL_Keycode key = event.key.keysym.sym;
 
-				Position *playerPos = (Position *)getComponentForGameObject(player, COMP_POSITION);
+				Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 
 				switch (key) {
 					case SDLK_ESCAPE:
@@ -134,32 +149,32 @@ int main() {
 
 					case SDLK_UP: {
 						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1};
-						if (canMove(newPos)) {
-							addComponentToGameObject(player, COMP_POSITION, &newPos);							
+						if (can_move(newPos)) {
+							game_object_add_component(player, COMP_POSITION, &newPos);							
 						}
 					}
 					break;
 
 					case SDLK_DOWN: {
 						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1};
-						if (canMove(newPos)) {
-							addComponentToGameObject(player, COMP_POSITION, &newPos);							
+						if (can_move(newPos)) {
+							game_object_add_component(player, COMP_POSITION, &newPos);							
 						}
 					}
 					break;
 
 					case SDLK_LEFT: {
 						Position newPos = {playerPos->objectId, playerPos->x - 1, playerPos->y};
-						if (canMove(newPos)) {
-							addComponentToGameObject(player, COMP_POSITION, &newPos);							
+						if (can_move(newPos)) {
+							game_object_add_component(player, COMP_POSITION, &newPos);							
 						}
 					}
 					break;
 
 					case SDLK_RIGHT: {
 						Position newPos = {playerPos->objectId, playerPos->x + 1, playerPos->y};
-						if (canMove(newPos)) {
-							addComponentToGameObject(player, COMP_POSITION, &newPos);							
+						if (can_move(newPos)) {
+							game_object_add_component(player, COMP_POSITION, &newPos);							
 						}
 					}
 					break;
@@ -170,7 +185,7 @@ int main() {
 			}
 		}
 
-		renderScreen(renderer, screen, console);
+		render_screen(renderer, screen, console);
 	}
 
 	SDL_DestroyRenderer(renderer);
