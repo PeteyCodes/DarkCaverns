@@ -51,10 +51,16 @@ global_variable Visibility visibilityComps[MAX_GO];
 global_variable Physical physicalComps[MAX_GO];
 
 
+typedef struct {
+	u32 x, y;
+} Point;
+
+
 /* Function Declarations */
+void map_carve_hallway_horz(Point from, Point to);
+void map_carve_hallway_vert(Point from, Point to);
 bool map_carve_room(u32 x, u32 y, u32 w, u32 h);
-
-
+Point rect_random_point(PT_Rect rect);
 
 
 
@@ -179,8 +185,10 @@ void map_generate() {
 		// Generate a random width/height for a room
 		u32 w = (rand() % 17) + 3;
 		u32 h = (rand() % 17) + 3;
-		u32 x = rand() % MAP_WIDTH - w - 1;
-		u32 y = rand() % MAP_HEIGHT - h - 1;
+		u32 x = rand() % (MAP_WIDTH - w - 1);
+		u32 y = rand() % (MAP_HEIGHT - h - 1);
+		if (x == 0) x = 1;
+		if (y == 0) y = 1;
 
 		bool success = map_carve_room(x, y, w, h);
 		if (success) {
@@ -191,19 +199,69 @@ void map_generate() {
 		}
 
 		// Exit condition - more that desired % of cells in use
-		if (((float)cellsUsed / (float)(MAP_HEIGHT * MAP_WIDTH)) > 0.65) {
+		if (((float)cellsUsed / (float)(MAP_HEIGHT * MAP_WIDTH)) > 0.45) {
 			roomsDone = true;
 		}
 	}
 
 	// Join all rooms with corridors, so that all rooms are reachable
+	for (u32 r = 1; r < roomCount; r++) {
+		PT_Rect from = rooms[r-1];
+		PT_Rect to = rooms[r];
 
+		// Join two rooms via random points in those rooms
+		Point fromPt = rect_random_point(from);
+		Point toPt = rect_random_point(to);
+
+		if (rand() % 2 == 0) {
+			// Move horizontal, then vertical
+			Point midPt = {toPt.x, fromPt.y};
+			map_carve_hallway_horz(fromPt, midPt);
+			map_carve_hallway_vert(midPt , toPt);
+		} else {
+			// Move vertical, then horizontal
+			Point midPt = {fromPt.x, toPt.y};
+			map_carve_hallway_vert(fromPt, midPt);
+			map_carve_hallway_horz(midPt, toPt);
+		}
+	}
+
+}
+
+void map_carve_hallway_horz(Point from, Point to) {
+	u32 first, last;
+	if (from.x < to.x) {
+		first = from.x;
+		last = to.x;
+	} else {
+		first = to.x;
+		last = from.x;
+	}
+
+	for (u32 x = first; x <= last; x ++) {
+		mapCells[x][from.y] = false;
+	}
+}
+
+void map_carve_hallway_vert(Point from, Point to) {
+	u32 first, last;
+	if (from.y < to.y) {
+		first = from.y;
+		last = to.y;
+	} else {
+		first = to.y;
+		last = from.y;
+	}
+
+	for (u32 y = first; y <= last; y++) {
+		mapCells[from.x][y] = false;
+	}
 }
 
 bool map_carve_room(u32 x, u32 y, u32 w, u32 h) {
 	// Determine if all the cells within the given rectangle are filled
-	for (u8 i = x; i < x + w; i++) {
-		for (u8 j = y; j < y + h; j++) {
+	for (u8 i = x-1; i < x + (w + 1); i++) {
+		for (u8 j = y-1; j < y + (h + 1); j++) {
 			if (mapCells[i][j] == false) {
 				return false;
 			}
@@ -220,12 +278,18 @@ bool map_carve_room(u32 x, u32 y, u32 w, u32 h) {
 	return true;
 }
 
+Point rect_random_point(PT_Rect rect) {
+	u32 px = (rand() % rect.w) + rect.x;
+	u32 py = (rand() % rect.h) + rect.y;
+	Point ret = {px, py};
+	return ret;
+}
 
 void wall_add(u8 x, u8 y) {
 	GameObject *wall = game_object_create();
 	Position wallPos = {wall->id, x, y};
 	game_object_add_component(wall, COMP_POSITION, &wallPos);
-	Visibility wallVis = {wall->id, '#', 0xFFFFFFFF, 0x000000FF};
+	Visibility wallVis = {wall->id, '#', 0x675644FF, 0x000000FF};
 	game_object_add_component(wall, COMP_VISIBILITY, &wallVis);
 	Physical wallPhys = {wall->id, true, true};
 	game_object_add_component(wall, COMP_PHYSICAL, &wallPhys);
