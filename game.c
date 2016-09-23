@@ -295,3 +295,38 @@ void wall_add(u8 x, u8 y) {
 	game_object_add_component(wall, COMP_PHYSICAL, &wallPhys);
 }
 
+
+/* Level Management */
+
+void level_init(GameObject *player) {
+
+	// Clear the previous level data from the world state
+	for (u32 i = 0; i < MAX_GO; i++) {
+		if ((gameObjects[i].id != player->id) && 
+			(gameObjects[i].id != UNUSED)) {
+			game_object_destroy(&gameObjects[i]);
+		}
+	}
+
+	// Generate a level map into the world state
+	map_generate();
+	for (u32 x = 0; x < MAP_WIDTH; x++) {
+		for (u32 y = 0; y < MAP_HEIGHT; y++) {
+			if (mapCells[x][y]) {
+				wall_add(x, y);
+			}
+		}
+	}
+
+	// Place the player in a random position within the level
+	for (;;) {
+		u32 x = rand() % MAP_WIDTH;
+		u32 y = rand() % MAP_HEIGHT;
+		if (mapCells[x][y] == false) {
+			Position pos = {player->id, x, y};
+			game_object_add_component(player, COMP_POSITION, &pos);
+			break;
+		}
+	}
+
+}

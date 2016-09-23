@@ -30,6 +30,7 @@ typedef int64_t		i64;
 
 #include "pt_console.c"
 #include "game.c"
+#include "fov.c"
 
 
 bool can_move(Position pos) {
@@ -61,8 +62,10 @@ void render_screen(SDL_Renderer *renderer,
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if (visibilityComps[i].objectId != UNUSED) {
 			Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
-			PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
-								visibilityComps[i].fgColor, visibilityComps[i].bgColor);
+			if (fovMap[p->x][p->y] > 0) {
+				PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
+									visibilityComps[i].fgColor, visibilityComps[i].bgColor);
+			}
 		}
 	}
 
@@ -72,7 +75,7 @@ void render_screen(SDL_Renderer *renderer,
 	SDL_RenderPresent(renderer);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 
 	srand((unsigned)time(NULL));
 
@@ -100,33 +103,20 @@ int main() {
 	world_state_init();
 
 	GameObject *player = game_object_create();
-	Position pos = {player->id, 25, 25};
-	game_object_add_component(player, COMP_POSITION, &pos);
 	Visibility vis = {player->id, '@', 0x00FF00FF, 0x000000FF};
 	game_object_add_component(player, COMP_VISIBILITY, &vis);
 	Physical phys = {player->id, true, true};
 	game_object_add_component(player, COMP_PHYSICAL, &phys);
 
-	// GameObject *wall = game_object_create();
-	// Position wallPos = {wall->id, 30, 25};
-	// game_object_add_component(wall, COMP_POSITION, &wallPos);
-	// Visibility wallVis = {wall->id, '#', 0xFFFFFFFF, 0x000000FF};
-	// game_object_add_component(wall, COMP_VISIBILITY, &wallVis);
-	// Physical wallPhys = {wall->id, true, true};
-	// game_object_add_component(wall, COMP_PHYSICAL, &wallPhys);
 
+	// Create a level and place our player in it
+	level_init(player);
+	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 
-	map_generate();
-	for (u32 x = 0; x < MAP_WIDTH; x++) {
-		for (u32 y = 0; y < MAP_HEIGHT; y++) {
-			if (mapCells[x][y]) {
-				wall_add(x, y);
-			}
-		}
-	}
-
+	fov_calculate(playerPos->x, playerPos->y, fovMap);
 
 	bool done = false;
+	bool recalculateFOV = false;
 	while (!done) {
 
 		SDL_Event event;
@@ -143,6 +133,13 @@ int main() {
 				Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 
 				switch (key) {
+
+					// DEBUG
+					case SDLK_m:
+						level_init(player);
+						break;
+					// END DEBUG
+
 					case SDLK_ESCAPE:
 						done = true;
 						break;
@@ -150,7 +147,8 @@ int main() {
 					case SDLK_UP: {
 						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1};
 						if (can_move(newPos)) {
-							game_object_add_component(player, COMP_POSITION, &newPos);							
+							game_object_add_component(player, COMP_POSITION, &newPos);
+							recalculateFOV = true;							
 						}
 					}
 					break;
@@ -159,6 +157,7 @@ int main() {
 						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1};
 						if (can_move(newPos)) {
 							game_object_add_component(player, COMP_POSITION, &newPos);							
+							recalculateFOV = true;							
 						}
 					}
 					break;
@@ -167,6 +166,7 @@ int main() {
 						Position newPos = {playerPos->objectId, playerPos->x - 1, playerPos->y};
 						if (can_move(newPos)) {
 							game_object_add_component(player, COMP_POSITION, &newPos);							
+							recalculateFOV = true;							
 						}
 					}
 					break;
@@ -175,6 +175,7 @@ int main() {
 						Position newPos = {playerPos->objectId, playerPos->x + 1, playerPos->y};
 						if (can_move(newPos)) {
 							game_object_add_component(player, COMP_POSITION, &newPos);							
+							recalculateFOV = true;							
 						}
 					}
 					break;
@@ -183,6 +184,12 @@ int main() {
 						break;
 				}
 			}
+		}
+
+		if (recalculateFOV) {
+			Position *pos = (Position *)game_object_get_component(player, COMP_POSITION);
+			fov_calculate(pos->x, pos->y, fovMap);
+			recalculateFOV = false;
 		}
 
 		render_screen(renderer, screen, console);
