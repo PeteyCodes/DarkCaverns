@@ -63,8 +63,14 @@ void render_screen(SDL_Renderer *renderer,
 		if (visibilityComps[i].objectId != UNUSED) {
 			Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
 			if (fovMap[p->x][p->y] > 0) {
+				visibilityComps[i].hasBeenSeen = true;
 				PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
 									visibilityComps[i].fgColor, visibilityComps[i].bgColor);
+			} else if (visibilityComps[i].hasBeenSeen) {
+				u32 fullColor = visibilityComps[i].fgColor;
+				u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
+				PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
+									fadedColor, 0x000000FF);
 			}
 		}
 	}
@@ -123,7 +129,7 @@ int main(int argc, char *argv[]) {
 		while (SDL_PollEvent(&event) != 0) {
 
 			if (event.type == SDL_QUIT) {
-				done = true;
+				done = true; 
 				break;
 			}
 

@@ -34,6 +34,7 @@ typedef struct {
 	asciiChar glyph;
 	u32 fgColor;
 	u32 bgColor;
+	bool hasBeenSeen;
 } Visibility;
 
 typedef struct {
@@ -157,6 +158,15 @@ void *game_object_get_component(GameObject *obj,
 	return obj->components[comp];
 }
 
+GameObject *game_object_at_position(u32 x, u32 y) {
+	for (u32 i = 0; i < MAX_GO; i++) {
+		Position p = positionComps[i];
+		if (p.objectId != UNUSED && p.x == x && p.y == y) {
+			return &gameObjects[i];
+		}
+	}
+	return NULL;
+}
 
 
 /* Map Management */

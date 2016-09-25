@@ -4,7 +4,28 @@
 
 #define FOV_DISTANCE	5
 
+typedef struct {
+	u32 x, y;
+} FovCell;
+
+typedef struct {
+	float startSlope;
+	float endSlope;
+} Shadow;
+
+
+void add_shadow(Shadow s);
+bool cell_blocks_sight(u32 x, u32 y);
+bool cell_in_shadow(float cellSlope);
+float fov_distance_between(u32 x1, u32 y1, u32 x2, u32 y2);
+float line_slope_between(float x1, float y1, float x2, float y2);
+
+
 global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
+
+internal Shadow knownShadows[10];
+internal u8 shadowCount = 0;
+
 
 void fov_calculate(u32 x, u32 y, u32 fovMap[][MAP_HEIGHT]) {
 
@@ -15,25 +36,89 @@ void fov_calculate(u32 x, u32 y, u32 fovMap[][MAP_HEIGHT]) {
 		}
 	}
 
-	// Cast visibility out in four directions
-	// Determine our visibility rectangle
-	u32 x1 = 0;
-	if (x >= FOV_DISTANCE) { x1 = x - FOV_DISTANCE; }
+	// TODO: Loop through all 8 sectors around the player
 
-	u32 x2 = x + FOV_DISTANCE;
-	if (x2 >= MAP_WIDTH) { x2 = MAP_WIDTH - 1; }
+	bool prev_blocking = false;
+	float shadowStart = 0.0;
+	float shadowEnd = 0.0;
+	// For each distance from 1 to FOV range
+	for (int cellY = y+1; cellY < y+FOV_DISTANCE; cellY++) {
+		prev_blocking = false;
+		// For each cell in the span
+		for (int cellX = x+0; cellX <= x+cellY+1; cellX++) {
+			// Translate cellX, cellY to map coordinates
 
-	u32 y1 = 0;
-	if (y >= FOV_DISTANCE) { y1 = y - FOV_DISTANCE; }
-	
-	u32 y2 = y + FOV_DISTANCE;
-	if (y2 >= MAP_HEIGHT) { y2 = MAP_HEIGHT - 1; }
-
-	// Apply visibility to FOV map
-	for (u32 fx = x1; fx <= x2; fx++) {
-		for (u32 fy = y1; fy <= y2; fy++) {
-			fovMap[fx][fy] = 10;
+			// Is cell within map?
+			
+			// Is cell within view distance?
+				if (fov_distance_between(x, y, cellX, cellY) <= FOV_DISTANCE) {
+					// Is cell within known shadow?
+					float cellSlope = line_slope_between(x, y, cellX, cellY);
+					if (!cell_in_shadow(cellSlope)) {
+						// No - Mark as visible
+						fovMap[cellX][cellY] = 1;
+						// Is cell blocking?
+						if (cell_blocks_sight(cellX, cellY)) {
+							// Was the last cell blocking?
+							if (prev_blocking == false) {
+								// No - calc start of a new shadow
+								shadowStart = line_slope_between(x, y, cellX-0.5, cellY);
+							}
+						} else {
+							// Was the last cell blocking?
+							if (prev_blocking) {
+								// Calc end slope of shadow.
+								shadowEnd = line_slope_between(x, y, cellX+0.5, cellY);
+								// Add to shadow list 
+								Shadow s = {shadowStart, shadowEnd};
+								add_shadow(s);
+							}
+						}
+					}
+				}
+		}
+		// Do we have an open shadow
+		if (prev_blocking) {
+			// If so, calc end and add shadow to list before moving to next span
+			shadowEnd = line_slope_between(x, y, cellY+1+0.5, cellY);
+			// Add to shadow list 
+			Shadow s = {shadowStart, shadowEnd};
+			add_shadow(s);
 		}
 	}
 
+}
+
+void add_shadow(Shadow s) {
+	knownShadows[shadowCount] = s;
+	shadowCount += 1;
+}
+
+bool cell_blocks_sight(u32 x, u32 y) {
+	GameObject *go = game_object_at_position(x, y);
+	if (go != NULL) {
+		Physical *phys = (Physical *)game_object_get_component(go, COMP_PHYSICAL);
+		if (phys->blocksSight) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool cell_in_shadow(float cellSlope) {
+	for (u8 i = 0; i < shadowCount; i++) {
+		Shadow s = knownShadows[i];
+		if (s.startSlope <= cellSlope && s.endSlope >= cellSlope) {
+			return true;
+		}
+	}
+	return false;
+}
+
+float fov_distance_between(u32 x1, u32 y1, u32 x2, u32 y2) {
+	return sqrt(pow(x2-x1, 2) + pow(y2-y1, 2));
+}
+
+float line_slope_between(float x1, float y1, float x2, float y2) {
+	return (y2 - y1) / (x2 - x1);
 }
