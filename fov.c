@@ -19,7 +19,7 @@ bool cell_blocks_sight(u32 x, u32 y);
 bool cell_in_shadow(float cellSlope);
 float fov_distance_between(u32 x1, u32 y1, u32 x2, u32 y2);
 float line_slope_between(float x1, float y1, float x2, float y2);
-
+FovCell map_cell_for_local_cell(u8 sector, FovCell heroMapCell, FovCell cellToTranslate);
 
 global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
 
@@ -27,7 +27,7 @@ internal Shadow knownShadows[10];
 internal u8 shadowCount = 0;
 
 
-void fov_calculate(u32 x, u32 y, u32 fovMap[][MAP_HEIGHT]) {
+void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 
 	// Reset FOV to default state (hidden)
 	for (u32 x = 0; x < MAP_WIDTH; x++) {
@@ -36,54 +36,62 @@ void fov_calculate(u32 x, u32 y, u32 fovMap[][MAP_HEIGHT]) {
 		}
 	}
 
-	// TODO: Loop through all 8 sectors around the player
+	// Mark hero cell visible
+	fovMap[heroX][heroY] = 1;
 
-	bool prev_blocking = false;
-	float shadowStart = 0.0;
-	float shadowEnd = 0.0;
-	// For each distance from 1 to FOV range
-	for (int cellY = y+1; cellY < y+FOV_DISTANCE; cellY++) {
-		prev_blocking = false;
-		// For each cell in the span
-		for (int cellX = x+0; cellX <= x+cellY+1; cellX++) {
-			// Translate cellX, cellY to map coordinates
+	// Loop through all 8 sectors around the player
+	for (u8 sector = 1; sector <= 8; sector++) {
+		bool prev_blocking = false;
+		float shadowStart = 0.0;
+		float shadowEnd = 0.0;
+		// For each distance from 1 to FOV range
+		for (int cellY = 1; cellY < FOV_DISTANCE; cellY++) {
+			prev_blocking = false;
+			// For each cell in the span
+			for (int cellX = 0; cellX <= cellY+1; cellX++) {
+				// Translate cellX, cellY to map coordinates
+				FovCell heroCell = {heroX, heroY};
+				FovCell cellToTranslate = {cellX, cellY};
+				FovCell mapCell = map_cell_for_local_cell(sector, heroCell, cellToTranslate);
 
-			// Is cell within map?
-			
-			// Is cell within view distance?
-				if (fov_distance_between(x, y, cellX, cellY) <= FOV_DISTANCE) {
-					// Is cell within known shadow?
-					float cellSlope = line_slope_between(x, y, cellX, cellY);
-					if (!cell_in_shadow(cellSlope)) {
-						// No - Mark as visible
-						fovMap[cellX][cellY] = 1;
-						// Is cell blocking?
-						if (cell_blocks_sight(cellX, cellY)) {
-							// Was the last cell blocking?
-							if (prev_blocking == false) {
-								// No - calc start of a new shadow
-								shadowStart = line_slope_between(x, y, cellX-0.5, cellY);
-							}
-						} else {
-							// Was the last cell blocking?
-							if (prev_blocking) {
-								// Calc end slope of shadow.
-								shadowEnd = line_slope_between(x, y, cellX+0.5, cellY);
-								// Add to shadow list 
-								Shadow s = {shadowStart, shadowEnd};
-								add_shadow(s);
+				// Is cell within map?
+				if ((mapCell.x >= 0) && (mapCell.y >= 0) && (mapCell.x < MAP_WIDTH) && (mapCell.y < MAP_HEIGHT)) {
+					// Is cell within view distance?
+					if (fov_distance_between(0, 0, cellX, cellY) <= FOV_DISTANCE) {
+						// Is cell within known shadow?
+						float cellSlope = line_slope_between(0, 0, cellX, cellY);
+						if (!cell_in_shadow(cellSlope)) {
+							// No - Mark as visible
+							fovMap[mapCell.x][mapCell.y] = 1;
+							// Is cell blocking?
+							if (cell_blocks_sight(mapCell.x, mapCell.y)) {
+								// Was the last cell blocking?
+								if (prev_blocking == false) {
+									// No - calc start of a new shadow
+									shadowStart = line_slope_between(0, 0, cellX-0.5, cellY);
+								}
+							} else {
+								// Was the last cell blocking?
+								if (prev_blocking) {
+									// Calc end slope of shadow.
+									shadowEnd = line_slope_between(0, 0, cellX+0.5, cellY);
+									// Add to shadow list 
+									Shadow s = {shadowStart, shadowEnd};
+									add_shadow(s);
+								}
 							}
 						}
 					}
 				}
-		}
-		// Do we have an open shadow
-		if (prev_blocking) {
-			// If so, calc end and add shadow to list before moving to next span
-			shadowEnd = line_slope_between(x, y, cellY+1+0.5, cellY);
-			// Add to shadow list 
-			Shadow s = {shadowStart, shadowEnd};
-			add_shadow(s);
+			}
+			// Do we have an open shadow
+			if (prev_blocking) {
+				// If so, calc end and add shadow to list before moving to next span
+				shadowEnd = line_slope_between(0, 0, cellY+1+0.5, cellY);
+				// Add to shadow list 
+				Shadow s = {shadowStart, shadowEnd};
+				add_shadow(s);
+			}
 		}
 	}
 
@@ -121,4 +129,54 @@ float fov_distance_between(u32 x1, u32 y1, u32 x2, u32 y2) {
 
 float line_slope_between(float x1, float y1, float x2, float y2) {
 	return (y2 - y1) / (x2 - x1);
+}
+
+// Return the map cell corresponding to the given local sector coordinates
+FovCell map_cell_for_local_cell(u8 sector, FovCell heroMapCell, FovCell cellToTranslate) {
+	switch (sector) {
+		case 1: {
+			FovCell mapCell = {heroMapCell.x + cellToTranslate.x, heroMapCell.y - cellToTranslate.y};
+			return mapCell;
+		}
+		break;
+		case 2: {
+			FovCell mapCell = {heroMapCell.x + cellToTranslate.y, heroMapCell.y - cellToTranslate.x};
+			return mapCell;
+		}
+		break;
+		case 3: {
+			FovCell mapCell = {heroMapCell.x + cellToTranslate.y, heroMapCell.y + cellToTranslate.x};
+			return mapCell;
+		}
+		break;
+		case 4: {
+			FovCell mapCell = {heroMapCell.x + cellToTranslate.x, heroMapCell.y + cellToTranslate.y};
+			return mapCell;
+		}
+		break;
+		case 5: {
+			FovCell mapCell = {heroMapCell.x - cellToTranslate.x, heroMapCell.y + cellToTranslate.y};
+			return mapCell;
+		}
+		break;
+		case 6: {
+			FovCell mapCell = {heroMapCell.x - cellToTranslate.y, heroMapCell.y + cellToTranslate.x};
+			return mapCell;
+		}
+		break;
+		case 7: {
+			FovCell mapCell = {heroMapCell.x - cellToTranslate.y, heroMapCell.y - cellToTranslate.x};
+			return mapCell;
+		}
+		break;
+		case 8: {
+			FovCell mapCell = {heroMapCell.x - cellToTranslate.x, heroMapCell.y - cellToTranslate.y};
+			return mapCell;
+		}
+		break;
+		default:
+			assert(false);
+			FovCell c = {0,0};
+			return c;
+	}
 }
