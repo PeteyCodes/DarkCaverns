@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <SDL2/SDL.h>
 
@@ -28,6 +29,7 @@ typedef int64_t		i64;
 #define global_variable static
 
 
+#include "list.c"
 #include "pt_console.c"
 #include "game.c"
 #include "fov.c"

@@ -42,13 +42,14 @@ void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 	// Loop through all 8 sectors around the player
 	for (u8 sector = 1; sector <= 8; sector++) {
 		bool prev_blocking = false;
+		shadowCount = 0;
 		float shadowStart = 0.0;
 		float shadowEnd = 0.0;
 		// For each distance from 1 to FOV range
 		for (int cellY = 1; cellY < FOV_DISTANCE; cellY++) {
 			prev_blocking = false;
 			// For each cell in the span
-			for (int cellX = 0; cellX <= cellY+1; cellX++) {
+			for (int cellX = 0; cellX <= cellY; cellX++) {
 				// Translate cellX, cellY to map coordinates
 				FovCell heroCell = {heroX, heroY};
 				FovCell cellToTranslate = {cellX, cellY};
@@ -68,7 +69,8 @@ void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 								// Was the last cell blocking?
 								if (prev_blocking == false) {
 									// No - calc start of a new shadow
-									shadowStart = line_slope_between(0, 0, cellX-0.5, cellY);
+									shadowStart = line_slope_between(0, 0, cellX, cellY);
+									prev_blocking = true;
 								}
 							} else {
 								// Was the last cell blocking?
@@ -87,7 +89,7 @@ void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 			// Do we have an open shadow
 			if (prev_blocking) {
 				// If so, calc end and add shadow to list before moving to next span
-				shadowEnd = line_slope_between(0, 0, cellY+1+0.5, cellY);
+				shadowEnd = line_slope_between(0, 0, cellY+0.5, cellY);
 				// Add to shadow list 
 				Shadow s = {shadowStart, shadowEnd};
 				add_shadow(s);
@@ -128,7 +130,13 @@ float fov_distance_between(u32 x1, u32 y1, u32 x2, u32 y2) {
 }
 
 float line_slope_between(float x1, float y1, float x2, float y2) {
-	return (y2 - y1) / (x2 - x1);
+	// We're actually calculating the inverse slope here, to yield a value
+	// between 0 and 1.
+	if (x2 - x1 <= 0) { 
+		return 0;
+	} else {
+		return (x2 - x1) / (y2 - y1);	
+	}
 }
 
 // Return the map cell corresponding to the given local sector coordinates
