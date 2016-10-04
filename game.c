@@ -59,8 +59,8 @@ typedef struct {
 typedef struct {
 	Point start;
 	Point end;
-	i8 roomFrom;
-	i8 roomTo;
+	i32 roomFrom;
+	i32 roomTo;
 } Segment;
 
 
@@ -69,8 +69,9 @@ void map_carve_hallway_horz(Point from, Point to);
 void map_carve_hallway_vert(Point from, Point to);
 bool map_carve_room(u32 x, u32 y, u32 w, u32 h);
 void map_carve_segments(List *segments, List *hallways);
-void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms);
+void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount);
 Point rect_random_point(PT_Rect rect);
+i32 room_containing_point(Point pt, PT_Rect *rooms, u32 roomCount);
 
 
 
@@ -224,8 +225,7 @@ void map_generate() {
 	}
 
 	// Join all rooms with corridors, so that all rooms are reachable
-	List *hallways = malloc(sizeof(List));
-	list_init(hallways, &free);
+	List *hallways = list_init(free);
 
 	for (u32 r = 1; r < roomCount; r++) {
 		PT_Rect from = rooms[r-1];
@@ -235,24 +235,26 @@ void map_generate() {
 		Point fromPt = rect_random_point(from);
 		Point toPt = rect_random_point(to);
 
-		List *segments = malloc(sizeof(List));
-		list_init(segments, &free);
+		List *segments = list_init(free);
 
+		Point midPt;
 		if (rand() % 2 == 0) {
 			// Move horizontal, then vertical
-			Point midPt = {toPt.x, fromPt.y};
+			midPt.x = toPt.x;
+			midPt.y = fromPt.y;
 		} else {
 			// Move vertical, then horizontal
-			Point midPt = {fromPt.x, toPt.y};
+			midPt.x = fromPt.x;
+			midPt.y = toPt.y;
 		}
 
 		// Break the proposed hallway into segments joining rooms
-		map_get_segments(segments, fromPt, midPt, rooms);
-		map_get_segments(segments, midPt, toPt, rooms);
+		map_get_segments(segments, fromPt, midPt, rooms, roomCount);
+		map_get_segments(segments, midPt, toPt, rooms, roomCount);
 
 		// Walk the segment list and eliminate any segments
 		// that join rooms that are already joined 
-		ListElement *e = list_head(segments)
+		ListElement *e = list_head(segments);
 		while (e != NULL) {
 
 
@@ -265,12 +267,10 @@ void map_generate() {
 
 		// Clean up
 		list_destroy(segments);
-		free(segments);
 	}
 
 	// Clean up
 	list_destroy(hallways);
-	free(hallways);
 }
 
 void map_carve_hallway_horz(Point from, Point to) {
@@ -330,7 +330,7 @@ void map_carve_segments(List *segments, List *hallways) {
 
 }
 
-void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms) {
+void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount) {
 	// Walk between our two points and find all the spans between rooms
 	Point curr = from;
 	bool isHorz = false;
@@ -344,8 +344,7 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms) {
 	i8 currRoom = -1; 
 	Point lastPoint = from;
 	while (curr.x != to.x && curr.y != to.y) {
-		i8 rm = room_containing_point(curr, rooms);
-
+		i32 rm = room_containing_point(curr, rooms, roomCount);
 		if (rm != -1 && rm != currRoom) {
 			// We have a new segment between currRoom and rm
 			Segment *s = malloc(sizeof(Segment));
@@ -368,12 +367,21 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms) {
 	}
 }
 
-
 Point rect_random_point(PT_Rect rect) {
 	u32 px = (rand() % rect.w) + rect.x;
 	u32 py = (rand() % rect.h) + rect.y;
 	Point ret = {px, py};
 	return ret;
+}
+
+i32 room_containing_point(Point pt, PT_Rect *rooms, u32 roomCount) {
+	for (i8 i = 0; i < roomCount; i++) {
+		if ((rooms[i].x <= pt.x) && ((rooms[i].x + rooms[i].w) > pt.x) &&
+			(rooms[i].y <= pt.y) && ((rooms[i].y + rooms[i].w) > pt.y)) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 void wall_add(u8 x, u8 y) {
