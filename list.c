@@ -111,7 +111,9 @@ void * list_remove(List *list, ListElement *element) {
 		data = list->head->data;
 		elementToRemove = list->head;
 		list->head = list->head->next;
-		list->head->prev = NULL;
+		if (list->head != NULL) {
+			list->head->prev = NULL;
+		}
 
 	} else {
 		data = element->next->data;

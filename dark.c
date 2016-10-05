@@ -65,7 +65,7 @@ void render_screen(SDL_Renderer *renderer,
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if (visibilityComps[i].objectId != UNUSED) {
 			Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
-			if (fovMap[p->x][p->y] > 0) {
+			if (fovMap[p->x][p->y] >= 0) {
 				visibilityComps[i].hasBeenSeen = true;
 				PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
 									visibilityComps[i].fgColor, visibilityComps[i].bgColor);

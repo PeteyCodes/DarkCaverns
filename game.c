@@ -68,7 +68,7 @@ typedef struct {
 void map_carve_hallway_horz(Point from, Point to);
 void map_carve_hallway_vert(Point from, Point to);
 bool map_carve_room(u32 x, u32 y, u32 w, u32 h);
-void map_carve_segments(List *segments, List *hallways);
+void map_carve_segments(List *hallways);
 void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount);
 Point rect_random_point(PT_Rect rect);
 i32 room_containing_point(Point pt, PT_Rect *rooms, u32 roomCount);
@@ -256,18 +256,40 @@ void map_generate() {
 		// that join rooms that are already joined 
 		ListElement *e = list_head(segments);
 		while (e != NULL) {
+			i32 rm1 = ((Segment *)(e->data))->roomFrom;
+			i32 rm2 = ((Segment *)(e->data))->roomTo;
+			ListElement *hallElement = list_head(hallways);
+			Segment *uSeg = NULL;
+			if (hallElement == NULL) {
+				uSeg = (Segment *)e->data;
+			}
+			else {
+				while (hallElement != NULL) {
+					if (((((Segment *)(hallElement->data))->roomFrom == rm1) &&
+						(((Segment *)(hallElement->data))->roomTo == rm2)) ||
+						((((Segment *)(hallElement->data))->roomTo == rm1) &&
+						(((Segment *)(hallElement->data))->roomFrom == rm2))) {
+						uSeg = (Segment *)e->data;
+						break;
+					}
+					hallElement = hallElement->next;
+				}
+			}
 
-
-
+			if (uSeg != NULL) {
+				Segment *segCopy = malloc(sizeof(Segment));
+				memcpy(segCopy, uSeg, sizeof(Segment));
+				list_insert_after(hallways, NULL, segCopy);
+			}
 			e = e->next;
 		}
-
-		// Carve out new segments and add them to hallway list
-		map_carve_segments(segments, hallways);
 
 		// Clean up
 		list_destroy(segments);
 	}
+
+	// Carve out unique hallways
+	map_carve_segments(hallways);
 
 	// Clean up
 	list_destroy(hallways);
@@ -323,11 +345,19 @@ bool map_carve_room(u32 x, u32 y, u32 w, u32 h) {
 	return true;
 }
 
-void map_carve_segments(List *segments, List *hallways) {
+void map_carve_segments(List *hallways) {
+	ListElement *e = list_head(hallways);
+	while (e != NULL) {
+		Point p1 = ((Segment *)(e->data))->start;
+		Point p2 = ((Segment *)(e->data))->end;
 
-				// map_carve_hallway_vert(fromPt, midPt);
-			// map_carve_hallway_horz(midPt, toPt);
-
+		if (p1.x == p2.x) {
+			map_carve_hallway_vert(p1, p2);			
+		} else {
+			map_carve_hallway_horz(p1, p2);
+		}
+		e = e->next;
+	}
 }
 
 void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount) {
@@ -343,7 +373,9 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 	}
 	i8 currRoom = -1; 
 	Point lastPoint = from;
-	while (curr.x != to.x && curr.y != to.y) {
+	bool done = false;
+	while (!done) {
+		if (curr.x == to.x && curr.y == to.y) { done = true; continue; }
 		i32 rm = room_containing_point(curr, rooms, roomCount);
 		if (rm != -1 && rm != currRoom) {
 			// We have a new segment between currRoom and rm
