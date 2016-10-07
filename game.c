@@ -254,25 +254,25 @@ void map_generate() {
 
 		// Walk the segment list and eliminate any segments
 		// that join rooms that are already joined 
-		ListElement *e = list_head(segments);
-		while (e != NULL) {
+		for (ListElement *e = list_head(segments); e != NULL; e = e->next) { 
 			i32 rm1 = ((Segment *)(e->data))->roomFrom;
 			i32 rm2 = ((Segment *)(e->data))->roomTo;
-			ListElement *hallElement = list_head(hallways);
+
 			Segment *uSeg = NULL;
-			if (hallElement == NULL) {
+			if (hallways->size == 0) {
 				uSeg = (Segment *)e->data;
-			}
-			else {
-				while (hallElement != NULL) {
-					if (((((Segment *)(hallElement->data))->roomFrom == rm1) &&
-						(((Segment *)(hallElement->data))->roomTo == rm2)) ||
-						((((Segment *)(hallElement->data))->roomTo == rm1) &&
-						(((Segment *)(hallElement->data))->roomFrom == rm2))) {
-						uSeg = (Segment *)e->data;
+			} else {
+				bool unique = true;
+				for (ListElement *h = list_head(hallways); h != NULL; h = h->next) {
+					Segment *seg = (Segment *)(h->data);
+					if (((seg->roomFrom == rm1) && (seg->roomTo == rm2)) || 
+						((seg->roomTo == rm1) && (seg->roomFrom == rm2))) {
+						unique = false;
 						break;
 					}
-					hallElement = hallElement->next;
+				}
+				if (unique) {
+					uSeg = (Segment *)e->data;
 				}
 			}
 
@@ -281,7 +281,6 @@ void map_generate() {
 				memcpy(segCopy, uSeg, sizeof(Segment));
 				list_insert_after(hallways, NULL, segCopy);
 			}
-			e = e->next;
 		}
 
 		// Clean up
@@ -371,30 +370,45 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 	} else {
 		if (from.y > to.y) { step = -1; }
 	}
-	i8 currRoom = -1; 
+	i8 currRoom = room_containing_point(curr, rooms, roomCount);
 	Point lastPoint = from;
 	bool done = false;
 	while (!done) {
-		if (curr.x == to.x && curr.y == to.y) { done = true; continue; }
 		i32 rm = room_containing_point(curr, rooms, roomCount);
-		if (rm != -1 && rm != currRoom) {
-			// We have a new segment between currRoom and rm
-			Segment *s = malloc(sizeof(Segment));
-			s->start = lastPoint;
-			s->end = curr;
-			s->roomFrom = currRoom;
-			s->roomTo = rm;
-			list_insert_after(segments, NULL, s);
+		if (curr.x == to.x && curr.y == to.y) { 
+			// We hit our endpoint - check if we're in another room or outside all rooms
+			// and if so, add another segment
+			if (rm != currRoom) {
+				// We have a new segment between currRoom and rm
+				Segment *s = malloc(sizeof(Segment));
+				s->start = lastPoint;
+				s->end = curr;
+				s->roomFrom = currRoom;
+				s->roomTo = rm;
+				list_insert_after(segments, NULL, s);
+			}
+			done = true; 
 
-			currRoom = rm;
-			lastPoint = curr;
-		}
-
-		// Move to next cell
-		if (isHorz) {
-			curr.x += step;
 		} else {
-			curr.y += step;
+			if (rm != -1 && rm != currRoom) {
+				// We have a new segment between currRoom and rm
+				Segment *s = malloc(sizeof(Segment));
+				s->start = lastPoint;
+				s->end = curr;
+				s->roomFrom = currRoom;
+				s->roomTo = rm;
+				list_insert_after(segments, NULL, s);
+
+				currRoom = rm;
+				lastPoint = curr;
+			}
+
+			// Move to next cell
+			if (isHorz) {
+				curr.x += step;
+			} else {
+				curr.y += step;
+			}
 		}
 	}
 }
