@@ -58,9 +58,11 @@ typedef struct {
 
 typedef struct {
 	Point start;
+	Point mid;
 	Point end;
 	i32 roomFrom;
 	i32 roomTo;
+	bool hasMidPt;
 } Segment;
 
 
@@ -228,29 +230,14 @@ void map_generate() {
 	List *hallways = list_init(free);
 
 	for (u32 r = 1; r < roomCount; r++) {
-		PT_Rect from = rooms[r-1];
-		PT_Rect to = rooms[r];
-
 		// Join two rooms via random points in those rooms
-		Point fromPt = rect_random_point(from);
-		Point toPt = rect_random_point(to);
+		Point fromPt = rect_random_point(rooms[r-1]);
+		Point toPt = rect_random_point(rooms[r]);
 
 		List *segments = list_init(free);
 
-		Point midPt;
-		if (rand() % 2 == 0) {
-			// Move horizontal, then vertical
-			midPt.x = toPt.x;
-			midPt.y = fromPt.y;
-		} else {
-			// Move vertical, then horizontal
-			midPt.x = fromPt.x;
-			midPt.y = toPt.y;
-		}
-
 		// Break the proposed hallway into segments joining rooms
-		map_get_segments(segments, fromPt, midPt, rooms, roomCount);
-		map_get_segments(segments, midPt, toPt, rooms, roomCount);
+		map_get_segments(segments, fromPt, toPt, rooms, roomCount);
 
 		// Walk the segment list and eliminate any segments
 		// that join rooms that are already joined 
@@ -261,6 +248,7 @@ void map_generate() {
 			Segment *uSeg = NULL;
 			if (hallways->size == 0) {
 				uSeg = (Segment *)e->data;
+				
 			} else {
 				bool unique = true;
 				for (ListElement *h = list_head(hallways); h != NULL; h = h->next) {
@@ -347,57 +335,157 @@ bool map_carve_room(u32 x, u32 y, u32 w, u32 h) {
 void map_carve_segments(List *hallways) {
 	ListElement *e = list_head(hallways);
 	while (e != NULL) {
-		Point p1 = ((Segment *)(e->data))->start;
-		Point p2 = ((Segment *)(e->data))->end;
+		Segment *seg = ((Segment *)(e->data));
+		if (seg->hasMidPt) {
+			// This segment turns midway, so draw both parts of the segment
+			Point p1 = seg->start;
+			Point p2 = seg->mid;
 
-		if (p1.x == p2.x) {
-			map_carve_hallway_vert(p1, p2);			
+			if (p1.x == p2.x) {
+				map_carve_hallway_vert(p1, p2);			
+			} else {
+				map_carve_hallway_horz(p1, p2);
+			}
+
+			p1 = seg->mid;
+			p2 = seg->end;
+
+			if (p1.x == p2.x) {
+				map_carve_hallway_vert(p1, p2);			
+			} else {
+				map_carve_hallway_horz(p1, p2);
+			}
+
 		} else {
-			map_carve_hallway_horz(p1, p2);
+			Point p1 = seg->start;
+			Point p2 = seg->end;
+
+			if (p1.x == p2.x) {
+				map_carve_hallway_vert(p1, p2);			
+			} else {
+				map_carve_hallway_horz(p1, p2);
+			}
 		}
+
 		e = e->next;
 	}
 }
 
 void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount) {
 	// Walk between our two points and find all the spans between rooms
+
+	// Determine a mid point, by moving first either horizontally or vertically
+	Point mid;
+	if (rand() % 2 == 0) {
+		// Move horizontal, then vertical
+		mid.x = to.x;
+		mid.y = from.y;
+	} else {
+		// Move vertical, then horizontal
+		mid.x = from.x;
+		mid.y = to.y;
+	}
+
 	Point curr = from;
 	bool isHorz = false;
 	i8 step = 1;
-	if (from.y == to.y) { 
+	if (from.y == mid.y) { 
 		isHorz = true;
-		if (from.x > to.x) { step = -1; } 
+		if (from.x > mid.x) { step = -1; }
 	} else {
-		if (from.y > to.y) { step = -1; }
+		if (from.y > mid.y) { step = -1; }
 	}
+
 	i8 currRoom = room_containing_point(curr, rooms, roomCount);
 	Point lastPoint = from;
 	bool done = false;
+	Segment *turnSegment = NULL;
 	while (!done) {
 		i32 rm = room_containing_point(curr, rooms, roomCount);
-		if (curr.x == to.x && curr.y == to.y) { 
+		if (curr.x == mid.x && curr.y == mid.y) {
+			// Check to see if we're in a room
+			if (rm != -1) {
+				if (rm != currRoom) {
+					// We have a new segment between currRoom and rm
+					Segment *s = malloc(sizeof(Segment));
+					s->start = lastPoint;
+					s->end = curr;
+					s->roomFrom = currRoom;
+					s->roomTo = rm;
+					s->hasMidPt = false;
+					list_insert_after(segments, NULL, s);
+				}
+
+			} else {
+				// We hit our midpoint and we're outside a room - record a partial segment
+				turnSegment = malloc(sizeof(Segment));
+				turnSegment->start = lastPoint;
+				turnSegment->mid = curr;
+				turnSegment->hasMidPt = true;
+				turnSegment->roomFrom = currRoom;
+			}
+
+			// Set a new "from" and change our step to reflect our new direction
+			from = curr;
+			isHorz = false;
+			step = 1;
+			if (from.y == to.y) { 
+				isHorz = true;
+				if (from.x > to.x) { step = -1; } 
+			} else {
+				if (from.y > to.y) { step = -1; }
+			}
+
+			// Move to next cell
+			if (isHorz) {
+				curr.x += step;
+			} else {
+				curr.y += step;
+			}
+
+		} else if (curr.x == to.x && curr.y == to.y) { 
 			// We hit our endpoint - check if we're in another room or outside all rooms
 			// and if so, add another segment
 			if (rm != currRoom) {
-				// We have a new segment between currRoom and rm
-				Segment *s = malloc(sizeof(Segment));
-				s->start = lastPoint;
-				s->end = curr;
-				s->roomFrom = currRoom;
-				s->roomTo = rm;
-				list_insert_after(segments, NULL, s);
+				if (turnSegment != NULL) {
+					// Complete our partial segment
+					turnSegment->end = curr;
+					turnSegment->roomTo = rm;
+					list_insert_after(segments, NULL, turnSegment);
+					turnSegment = NULL;
+
+				} else {
+					// We have a new segment between currRoom and rm
+					Segment *s = malloc(sizeof(Segment));
+					s->start = lastPoint;
+					s->end = curr;
+					s->roomFrom = currRoom;
+					s->roomTo = rm;
+					s->hasMidPt = false;
+					list_insert_after(segments, NULL, s);
+				}
 			}
 			done = true; 
 
 		} else {
 			if (rm != -1 && rm != currRoom) {
-				// We have a new segment between currRoom and rm
-				Segment *s = malloc(sizeof(Segment));
-				s->start = lastPoint;
-				s->end = curr;
-				s->roomFrom = currRoom;
-				s->roomTo = rm;
-				list_insert_after(segments, NULL, s);
+				if (turnSegment != NULL) {
+					// Complete our partial segment
+					turnSegment->end = curr;
+					turnSegment->roomTo = rm;
+					list_insert_after(segments, NULL, turnSegment);
+					turnSegment = NULL;
+					
+				} else {
+					// We have a new segment between currRoom and rm
+					Segment *s = malloc(sizeof(Segment));
+					s->start = lastPoint;
+					s->end = curr;
+					s->roomFrom = currRoom;
+					s->roomTo = rm;
+					s->hasMidPt = false;
+					list_insert_after(segments, NULL, s);
+				}
 
 				currRoom = rm;
 				lastPoint = curr;
