@@ -62,7 +62,7 @@ typedef struct {
 	Point end;
 	i32 roomFrom;
 	i32 roomTo;
-	bool hasMidPt;
+	bool hasWaypoint;
 } Segment;
 
 
@@ -189,7 +189,6 @@ GameObject *game_object_at_position(u32 x, u32 y) {
 bool mapCells[MAP_WIDTH][MAP_HEIGHT];
 
 void map_generate() {
-
 	// Mark all the map cells as "filled"
 	for (u32 x = 0; x < MAP_WIDTH; x++) {
 		for (u32 y = 0; y < MAP_HEIGHT; y++) {
@@ -239,7 +238,7 @@ void map_generate() {
 		// Break the proposed hallway into segments joining rooms
 		map_get_segments(segments, fromPt, toPt, rooms, roomCount);
 
-		// Walk the segment list and eliminate any segments
+		// Walk the segment list and skip adding any segments
 		// that join rooms that are already joined 
 		for (ListElement *e = list_head(segments); e != NULL; e = e->next) { 
 			i32 rm1 = ((Segment *)(e->data))->roomFrom;
@@ -292,7 +291,7 @@ void map_carve_hallway_horz(Point from, Point to) {
 		last = from.x;
 	}
 
-	for (u32 x = first; x <= last; x ++) {
+	for (u32 x = first; x <= last; x++) {
 		mapCells[x][from.y] = false;
 	}
 }
@@ -333,10 +332,11 @@ bool map_carve_room(u32 x, u32 y, u32 w, u32 h) {
 }
 
 void map_carve_segments(List *hallways) {
-	ListElement *e = list_head(hallways);
-	while (e != NULL) {
-		Segment *seg = ((Segment *)(e->data));
-		if (seg->hasMidPt) {
+
+	for (ListElement *e = list_head(hallways); e != NULL; e = e->next) {
+		Segment *seg = (Segment *)e->data;
+
+		if (seg->hasWaypoint) {
 			// This segment turns midway, so draw both parts of the segment
 			Point p1 = seg->start;
 			Point p2 = seg->mid;
@@ -366,34 +366,37 @@ void map_carve_segments(List *hallways) {
 				map_carve_hallway_horz(p1, p2);
 			}
 		}
-
-		e = e->next;
 	}
+
 }
 
 void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount) {
 	// Walk between our two points and find all the spans between rooms
-
-	// Determine a mid point, by moving first either horizontally or vertically
-	Point mid;
-	if (rand() % 2 == 0) {
-		// Move horizontal, then vertical
-		mid.x = to.x;
-		mid.y = from.y;
-	} else {
-		// Move vertical, then horizontal
-		mid.x = from.x;
-		mid.y = to.y;
+	bool usingWaypoint = false;
+	Point wayPoint = to;
+	if (from.x != to.x && from.y != to.y) {
+		// Need to use a two-part segment to get between points
+		// Determine a waypoint where we'll turn
+		usingWaypoint = true;
+		if (rand() % 2 == 0) {
+			// Move horizontal, then vertical
+			wayPoint.x = to.x;
+			wayPoint.y = from.y;
+		} else {
+			// Move vertical, then horizontal
+			wayPoint.x = from.x;
+			wayPoint.y = to.y;
+		}
 	}
 
 	Point curr = from;
 	bool isHorz = false;
 	i8 step = 1;
-	if (from.y == mid.y) { 
+	if (from.y == wayPoint.y) { 
 		isHorz = true;
-		if (from.x > mid.x) { step = -1; }
+		if (from.x > wayPoint.x) { step = -1; }
 	} else {
-		if (from.y > mid.y) { step = -1; }
+		if (from.y > wayPoint.y) { step = -1; }
 	}
 
 	i8 currRoom = room_containing_point(curr, rooms, roomCount);
@@ -402,7 +405,7 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 	Segment *turnSegment = NULL;
 	while (!done) {
 		i32 rm = room_containing_point(curr, rooms, roomCount);
-		if (curr.x == mid.x && curr.y == mid.y) {
+		if (usingWaypoint && curr.x == wayPoint.x && curr.y == wayPoint.y) {
 			// Check to see if we're in a room
 			if (rm != -1) {
 				if (rm != currRoom) {
@@ -412,8 +415,14 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 					s->end = curr;
 					s->roomFrom = currRoom;
 					s->roomTo = rm;
-					s->hasMidPt = false;
+					s->hasWaypoint = false;
 					list_insert_after(segments, NULL, s);
+
+					currRoom = rm;
+				} else {
+					// We haven't left our starting room yet, so change our lastPoint
+					// to be our waypoint, so we're just drawing a single part segment.
+					lastPoint = wayPoint;
 				}
 
 			} else {
@@ -421,7 +430,7 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 				turnSegment = malloc(sizeof(Segment));
 				turnSegment->start = lastPoint;
 				turnSegment->mid = curr;
-				turnSegment->hasMidPt = true;
+				turnSegment->hasWaypoint = true;
 				turnSegment->roomFrom = currRoom;
 			}
 
@@ -444,11 +453,10 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 			}
 
 		} else if (curr.x == to.x && curr.y == to.y) { 
-			// We hit our endpoint - check if we're in another room or outside all rooms
-			// and if so, add another segment
+			// We hit our endpoint - check if we're in another room or still in the same room
 			if (rm != currRoom) {
 				if (turnSegment != NULL) {
-					// Complete our partial segment
+					// We already have a partial segment, so complete it
 					turnSegment->end = curr;
 					turnSegment->roomTo = rm;
 					list_insert_after(segments, NULL, turnSegment);
@@ -461,7 +469,7 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 					s->end = curr;
 					s->roomFrom = currRoom;
 					s->roomTo = rm;
-					s->hasMidPt = false;
+					s->hasWaypoint = false;
 					list_insert_after(segments, NULL, s);
 				}
 			}
@@ -483,7 +491,7 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 					s->end = curr;
 					s->roomFrom = currRoom;
 					s->roomTo = rm;
-					s->hasMidPt = false;
+					s->hasWaypoint = false;
 					list_insert_after(segments, NULL, s);
 				}
 
@@ -502,8 +510,8 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 }
 
 Point rect_random_point(PT_Rect rect) {
-	u32 px = (rand() % rect.w) + rect.x;
-	u32 py = (rand() % rect.h) + rect.y;
+	u32 px = (rand() % (rect.w - 1)) + rect.x;
+	u32 py = (rand() % (rect.h - 1)) + rect.y;
 	Point ret = {px, py};
 	return ret;
 }
@@ -511,7 +519,7 @@ Point rect_random_point(PT_Rect rect) {
 i32 room_containing_point(Point pt, PT_Rect *rooms, u32 roomCount) {
 	for (i8 i = 0; i < roomCount; i++) {
 		if ((rooms[i].x <= pt.x) && ((rooms[i].x + rooms[i].w) > pt.x) &&
-			(rooms[i].y <= pt.y) && ((rooms[i].y + rooms[i].w) > pt.y)) {
+			(rooms[i].y <= pt.y) && ((rooms[i].y + rooms[i].h) > pt.y)) {
 			return i;
 		}
 	}
@@ -532,7 +540,6 @@ void wall_add(u8 x, u8 y) {
 /* Level Management */
 
 void level_init(GameObject *player) {
-
 	// Clear the previous level data from the world state
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if ((gameObjects[i].id != player->id) && 
@@ -561,5 +568,4 @@ void level_init(GameObject *player) {
 			break;
 		}
 	}
-
 }
