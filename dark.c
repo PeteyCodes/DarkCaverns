@@ -32,6 +32,7 @@ typedef int64_t		i64;
 
 #include "list.c"
 #include "pt_console.c"
+#include "map.c"
 #include "game.c"
 #include "fov.c"
 
