@@ -2,7 +2,7 @@
 * fov.c
 */
 
-#define FOV_DISTANCE	5
+#define FOV_DISTANCE	10
 
 typedef struct {
 	u32 x, y;

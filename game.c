@@ -43,6 +43,15 @@ typedef struct {
 	bool blocksSight;
 } Physical;
 
+typedef struct {
+	u32 objectId;
+	u32 speed;				// How many spaces the object can move when it moves.
+	u32 frequency;			// How often the object moves. 1=every tick, 2=every other tick, etc.
+	u8 ticksUntilNextMove;	// Countdown to next move. Moves when = 0.
+	Point destination;
+	bool hasDestination;
+} Movement;
+
 
 /* World State */
 #define MAX_GO 	10000
@@ -50,6 +59,7 @@ global_variable GameObject gameObjects[MAX_GO];
 global_variable Position positionComps[MAX_GO];
 global_variable Visibility visibilityComps[MAX_GO];
 global_variable Physical physicalComps[MAX_GO];
+global_variable Movement movementComps[MAX_GO];
 
 
 /* World State Management */
@@ -59,6 +69,7 @@ void world_state_init() {
 		positionComps[i].objectId = UNUSED;
 		visibilityComps[i].objectId = UNUSED;
 		physicalComps[i].objectId = UNUSED;
+		movementComps[i].objectId = UNUSED;
 	}
 }
 
@@ -124,6 +135,18 @@ void game_object_add_component(GameObject *obj,
 
 			break;
 
+		case COMP_MOVEMENT:
+			Movement *mv = &movementComps[obj->id];
+			Movement *mvData = (Movement *)compData;
+			mv->objectId = obj->id;
+			mv->speed = mvData->speed;
+			mv->frequency = mvData->frequency;
+			mv->ticksUntilNextMove = mvData->ticksUntilNextMove;
+
+			obj->components[comp] = mv;
+
+			break;
+
 		default:
 			assert(1 == 0);
 	}
@@ -134,6 +157,7 @@ void game_object_destroy(GameObject *obj) {
 	positionComps[obj->id].objectId = UNUSED;
 	visibilityComps[obj->id].objectId = UNUSED;
 	physicalComps[obj->id].objectId = UNUSED;
+	movementComps[obj->id].objectId = UNUSED;
 	// TODO: Clean up other components used by this object
 
 	obj->id = UNUSED;
@@ -158,11 +182,21 @@ GameObject *game_object_at_position(u32 x, u32 y) {
 
 /* Game objects */
 
+void floor_add(u8 x, u8 y) {
+	GameObject *floor = game_object_create();
+	Position floorPos = {.objectId = floor->id, .x = x, .y = y};
+	game_object_add_component(floor, COMP_POSITION, &floorPos);
+	Visibility floorVis = {.objectId = floor->id, .glyph = '.', .fgColor = 0x3e3c3cFF, .bgColor = 0x00000000};
+	game_object_add_component(floor, COMP_VISIBILITY, &floorVis);
+	Physical floorPhys = {.objectId = floor->id, .blocksMovement = false, .blocksSight = false};
+	game_object_add_component(floor, COMP_PHYSICAL, &floorPhys);
+}
+
 void wall_add(u8 x, u8 y) {
 	GameObject *wall = game_object_create();
 	Position wallPos = {wall->id, x, y};
 	game_object_add_component(wall, COMP_POSITION, &wallPos);
-	Visibility wallVis = {wall->id, '#', 0x675644FF, 0x000000FF};
+	Visibility wallVis = {wall->id, '#', 0x675644FF, 0x00000000};
 	game_object_add_component(wall, COMP_VISIBILITY, &wallVis);
 	Physical wallPhys = {wall->id, true, true};
 	game_object_add_component(wall, COMP_PHYSICAL, &wallPhys);
@@ -186,6 +220,8 @@ void level_init(GameObject *player) {
 		for (u32 y = 0; y < MAP_HEIGHT; y++) {
 			if (mapCells[x][y]) {
 				wall_add(x, y);
+			} else {
+				floor_add(x, y);
 			}
 		}
 	}
@@ -200,4 +236,35 @@ void level_init(GameObject *player) {
 			break;
 		}
 	}
+}
+
+
+/* Movement System */
+
+void movement_update() {
+
+	for (u32 i = 0; i < MAX_GO; i++) {
+		if (movementComps[i].objectId != UNUSED) {
+			Movement *mv = movementComps[i];
+
+			// Determine if the object is going to move this tick
+			mv->ticksUntilNextMove -= 1;
+			if (mv->ticksUntilNextMove <= 0) {
+				// The object is moving, so determine new position based on destination and speed
+				Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
+				Position newPos = {p->objectId, p->x, p->y};
+
+				// TODO: Determine new position
+
+				// Test to see if the new position can be moved to
+				if (can_move(newPos)) {
+					game_object_add_component(&gameObjects[i], COMP_POSITION, &newPos);
+				}
+
+				mv->ticksUntilNextMove = mv->frequency;				
+			}
+
+		}
+	}
+
 }

@@ -66,7 +66,7 @@ void render_screen(SDL_Renderer *renderer,
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if (visibilityComps[i].objectId != UNUSED) {
 			Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
-			if (fovMap[p->x][p->y] >= 0) {
+			if (fovMap[p->x][p->y] > 0) {
 				visibilityComps[i].hasBeenSeen = true;
 				PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
 									visibilityComps[i].fgColor, visibilityComps[i].bgColor);
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
 	world_state_init();
 
 	GameObject *player = game_object_create();
-	Visibility vis = {player->id, '@', 0x00FF00FF, 0x000000FF};
+	Visibility vis = {player->id, '@', 0x00FF00FF, 0x00000000};
 	game_object_add_component(player, COMP_VISIBILITY, &vis);
 	Physical phys = {player->id, true, true};
 	game_object_add_component(player, COMP_PHYSICAL, &phys);
@@ -195,6 +195,9 @@ int main(int argc, char *argv[]) {
 				}
 			}
 		}
+
+		// Have things move themselves around the dungeon
+		movement_update();
 
 		if (recalculateFOV) {
 			Position *pos = (Position *)game_object_get_component(player, COMP_POSITION);

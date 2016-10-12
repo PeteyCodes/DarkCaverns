@@ -53,8 +53,8 @@ void map_generate() {
 	u32 roomCount = 0;
 	while (!roomsDone) {
 		// Generate a random width/height for a room
-		u32 w = (rand() % 17) + 3;
-		u32 h = (rand() % 17) + 3;
+		u32 w = (rand() % 17) + 5;
+		u32 h = (rand() % 17) + 5;
 		u32 x = rand() % (MAP_WIDTH - w - 1);
 		u32 y = rand() % (MAP_HEIGHT - h - 1);
 		if (x == 0) x = 1;
