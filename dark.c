@@ -37,44 +37,41 @@ typedef int64_t		i64;
 #include "fov.c"
 
 
-bool can_move(Position pos) {
-	bool moveAllowed = true;
-
-	if ((pos.x >= 0) && (pos.x < NUM_COLS) && (pos.y >= 0) && (pos.y < NUM_ROWS)) {
-		for (u32 i = 0; i < MAX_GO; i++) {
-			Position p = positionComps[i];
-			if ((p.objectId != UNUSED) && (p.x == pos.x) && (p.y == pos.y)) {
-				if (physicalComps[i].blocksMovement == true) {
-					moveAllowed = false;
-				}
-			}
-		}
-
-	} else {
-		moveAllowed = false;
-	}
-
-	return moveAllowed;
-}
-
 void render_screen(SDL_Renderer *renderer, 
 				  SDL_Texture *screen, 
 				  PT_Console *console) {
 
 	PT_ConsoleClear(console);
 
+	// Setup layer render history  
+	u8 layerRendered[MAP_WIDTH][MAP_HEIGHT];
+	for (u32 x = 0; x < MAP_WIDTH; x++) {
+		for (u32 y = 0; y < MAP_HEIGHT; y++) {
+			layerRendered[x][y] = LAYER_UNSET;
+		}
+	}
+
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if (visibilityComps[i].objectId != UNUSED) {
 			Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
 			if (fovMap[p->x][p->y] > 0) {
 				visibilityComps[i].hasBeenSeen = true;
-				PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
-									visibilityComps[i].fgColor, visibilityComps[i].bgColor);
-			} else if (visibilityComps[i].hasBeenSeen) {
+				// Don't render if we've already written something to to this cell at a higher layer
+				if (p->layer > layerRendered[p->x][p->y]) {
+					PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
+										visibilityComps[i].fgColor, visibilityComps[i].bgColor);
+					layerRendered[p->x][p->y] = p->layer;
+				}
+
+			} else if (visibilityComps[i].visibleOutsideFOV && visibilityComps[i].hasBeenSeen) {
 				u32 fullColor = visibilityComps[i].fgColor;
 				u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
-				PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
-									fadedColor, 0x000000FF);
+				// Don't render if we've already written something to to this cell at a higher layer
+				if (p->layer > layerRendered[p->x][p->y]) {
+					PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
+										fadedColor, 0x000000FF);
+					layerRendered[p->x][p->y] = p->layer;
+				}
 			}
 		}
 	}
@@ -127,7 +124,10 @@ int main(int argc, char *argv[]) {
 
 	bool done = false;
 	bool recalculateFOV = false;
+	bool playerMoved = false;
 	while (!done) {
+
+		playerMoved = false;
 
 		SDL_Event event;
 		while (SDL_PollEvent(&event) != 0) {
@@ -155,37 +155,41 @@ int main(int argc, char *argv[]) {
 						break;
 
 					case SDLK_UP: {
-						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1};
+						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1, LAYER_TOP};
 						if (can_move(newPos)) {
 							game_object_add_component(player, COMP_POSITION, &newPos);
-							recalculateFOV = true;							
+							recalculateFOV = true;					
+							playerMoved = true;		
 						}
 					}
 					break;
 
 					case SDLK_DOWN: {
-						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1};
+						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1, LAYER_TOP};
 						if (can_move(newPos)) {
 							game_object_add_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
+							playerMoved = true;		
 						}
 					}
 					break;
 
 					case SDLK_LEFT: {
-						Position newPos = {playerPos->objectId, playerPos->x - 1, playerPos->y};
+						Position newPos = {playerPos->objectId, playerPos->x - 1, playerPos->y, LAYER_TOP};
 						if (can_move(newPos)) {
 							game_object_add_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
+							playerMoved = true;		
 						}
 					}
 					break;
 
 					case SDLK_RIGHT: {
-						Position newPos = {playerPos->objectId, playerPos->x + 1, playerPos->y};
+						Position newPos = {playerPos->objectId, playerPos->x + 1, playerPos->y, LAYER_TOP};
 						if (can_move(newPos)) {
 							game_object_add_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
+							playerMoved = true;		
 						}
 					}
 					break;
@@ -196,8 +200,10 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		// Have things move themselves around the dungeon
-		movement_update();
+		// Have things move themselves around the dungeon if the player moved
+		if (playerMoved) {
+			movement_update();			
+		}
 
 		if (recalculateFOV) {
 			Position *pos = (Position *)game_object_get_component(player, COMP_POSITION);

@@ -4,6 +4,13 @@
 
 #define UNUSED	100000
 
+#define LAYER_UNSET		0
+#define LAYER_GROUND	1
+#define LAYER_MID		2
+#define LAYER_AIR		3
+#define LAYER_TOP		4
+
+
 typedef enum {
 	COMP_POSITION = 0,
 	COMP_VISIBILITY,
@@ -27,6 +34,7 @@ typedef struct {
 typedef struct {
 	u32 objectId;
 	u8 x, y;	
+	u8 layer;				// 1 is bottom layer
 } Position;
 
 typedef struct {
@@ -35,6 +43,7 @@ typedef struct {
 	u32 fgColor;
 	u32 bgColor;
 	bool hasBeenSeen;
+	bool visibleOutsideFOV;
 } Visibility;
 
 typedef struct {
@@ -107,6 +116,7 @@ void game_object_add_component(GameObject *obj,
 			pos->objectId = obj->id;
 			pos->x = posData->x;
 			pos->y = posData->y;
+			pos->layer = posData->layer;
 
 			obj->components[comp] = pos;
 
@@ -119,6 +129,7 @@ void game_object_add_component(GameObject *obj,
 			vis->glyph = visData->glyph;
 			vis->fgColor = visData->fgColor;
 			vis->bgColor = visData->bgColor;
+			vis->visibleOutsideFOV = visData->visibleOutsideFOV;
 
 			obj->components[comp] = vis;
 
@@ -184,19 +195,31 @@ GameObject *game_object_at_position(u32 x, u32 y) {
 
 void floor_add(u8 x, u8 y) {
 	GameObject *floor = game_object_create();
-	Position floorPos = {.objectId = floor->id, .x = x, .y = y};
+	Position floorPos = {.objectId = floor->id, .x = x, .y = y, .layer = LAYER_GROUND};
 	game_object_add_component(floor, COMP_POSITION, &floorPos);
-	Visibility floorVis = {.objectId = floor->id, .glyph = '.', .fgColor = 0x3e3c3cFF, .bgColor = 0x00000000};
+	Visibility floorVis = {.objectId = floor->id, .glyph = '.', .fgColor = 0x3e3c3cFF, .bgColor = 0x00000000, .visibleOutsideFOV = true};
 	game_object_add_component(floor, COMP_VISIBILITY, &floorVis);
 	Physical floorPhys = {.objectId = floor->id, .blocksMovement = false, .blocksSight = false};
 	game_object_add_component(floor, COMP_PHYSICAL, &floorPhys);
 }
 
+void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency) {
+	GameObject *npc = game_object_create();
+	Position pos = {.objectId = npc->id, .x = x, .y = y, .layer = layer};
+	game_object_add_component(npc, COMP_POSITION, &pos);
+	Visibility vis = {.objectId = npc->id, .glyph = glyph, .fgColor = fgColor, .bgColor = 0x00000000, .visibleOutsideFOV = false};
+	game_object_add_component(npc, COMP_VISIBILITY, &vis);
+	Physical phys = {.objectId = npc->id, .blocksMovement = true, .blocksSight = false};
+	game_object_add_component(npc, COMP_PHYSICAL, &phys);
+	Movement mv = {.objectId = npc->id, .speed = speed, .frequency = frequency, .ticksUntilNextMove = frequency};
+	game_object_add_component(npc, COMP_MOVEMENT, &mv);
+}
+
 void wall_add(u8 x, u8 y) {
 	GameObject *wall = game_object_create();
-	Position wallPos = {wall->id, x, y};
+	Position wallPos = {.objectId = wall->id, .x = x, .y = y, .layer = LAYER_GROUND};
 	game_object_add_component(wall, COMP_POSITION, &wallPos);
-	Visibility wallVis = {wall->id, '#', 0x675644FF, 0x00000000};
+	Visibility wallVis = {wall->id, '#', 0x675644FF, 0x00000000, .visibleOutsideFOV = true};
 	game_object_add_component(wall, COMP_VISIBILITY, &wallVis);
 	Physical wallPhys = {wall->id, true, true};
 	game_object_add_component(wall, COMP_PHYSICAL, &wallPhys);
@@ -204,6 +227,17 @@ void wall_add(u8 x, u8 y) {
 
 
 /* Level Management */
+
+Point level_get_open_point() {
+	// Return a random position within the level that is open
+	for (;;) {
+		u32 x = rand() % MAP_WIDTH;
+		u32 y = rand() % MAP_HEIGHT;
+		if (mapCells[x][y] == false) {
+			return (Point) {x, y};
+		}
+	}
+}
 
 void level_init(GameObject *player) {
 	// Clear the previous level data from the world state
@@ -226,42 +260,72 @@ void level_init(GameObject *player) {
 		}
 	}
 
-	// Place the player in a random position within the level
-	for (;;) {
-		u32 x = rand() % MAP_WIDTH;
-		u32 y = rand() % MAP_HEIGHT;
-		if (mapCells[x][y] == false) {
-			Position pos = {player->id, x, y};
-			game_object_add_component(player, COMP_POSITION, &pos);
-			break;
-		}
-	}
+	// Generate some monsters and drop them randomly in the level
+	// TODO: Remove hard-coding
+	Point pt = level_get_open_point();
+	npc_add(pt.x, pt.y, LAYER_TOP, 'g', 0xaa0000ff, 1, 1);
+	pt = level_get_open_point();
+	npc_add(pt.x, pt.y, LAYER_TOP, 's', 0x009900ff, 1, 1);
+	pt = level_get_open_point();
+	npc_add(pt.x, pt.y, LAYER_TOP, 'k', 0x000077ff, 1, 1);
+
+	// Place our player in a random position in the level
+	pt = level_get_open_point();
+	Position pos = {.objectId = player->id, .x = pt.x, .y = pt.y, .layer = LAYER_TOP};
+	game_object_add_component(player, COMP_POSITION, &pos);
 }
 
 
 /* Movement System */
 
+bool can_move(Position pos) {
+	bool moveAllowed = true;
+
+	if ((pos.x >= 0) && (pos.x < NUM_COLS) && (pos.y >= 0) && (pos.y < NUM_ROWS)) {
+		for (u32 i = 0; i < MAX_GO; i++) {
+			Position p = positionComps[i];
+			if ((p.objectId != UNUSED) && (p.x == pos.x) && (p.y == pos.y)) {
+				if (physicalComps[i].blocksMovement == true) {
+					moveAllowed = false;
+				}
+			}
+		}
+
+	} else {
+		moveAllowed = false;
+	}
+
+	return moveAllowed;
+}
+
 void movement_update() {
 
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if (movementComps[i].objectId != UNUSED) {
-			Movement *mv = movementComps[i];
+			Movement *mv = &movementComps[i];
 
 			// Determine if the object is going to move this tick
 			mv->ticksUntilNextMove -= 1;
 			if (mv->ticksUntilNextMove <= 0) {
 				// The object is moving, so determine new position based on destination and speed
 				Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
-				Position newPos = {p->objectId, p->x, p->y};
+				Position newPos = {.objectId = p->objectId, .x = p->x, .y = p->y, .layer = p->layer};
 
-				// TODO: Determine new position
+				// Determine new position
+				// TODO: Come up with a more intelligent way to do this. For now, just pick random direction.
+				u32 dir = rand() % 4;
+				if (dir == 0) { newPos.x -= 1; }
+				else if (dir == 1) { newPos.y -= 1; }
+				else if (dir == 2) { newPos.x += 1; }
+				else { newPos.y += 1; }
 
 				// Test to see if the new position can be moved to
 				if (can_move(newPos)) {
 					game_object_add_component(&gameObjects[i], COMP_POSITION, &newPos);
+					mv->ticksUntilNextMove = mv->frequency;				
+				} else {
+					mv->ticksUntilNextMove += 1;
 				}
-
-				mv->ticksUntilNextMove = mv->frequency;				
 			}
 
 		}
