@@ -11,6 +11,12 @@
 #define HM_INITIAL_SIZE (256)
 #define HM_MAX_CHAIN_LENGTH (8)
 
+#define HM_MISSING  -3  /* No such element */
+#define HM_FULL     -2  /* Hashmap is full */
+#define HM_OMEM     -1  /* Out of memory */     
+#define HM_OK       0
+
+
 typedef struct {
     char *key;
     bool inUse;
@@ -20,22 +26,43 @@ typedef struct {
 typedef struct {
     i32 tableSize;
     i32 size;
+
+    void (*destroy)(void *data);
+    
     HashmapElement *data;    
 } Hashmap;
 
 
-/* Public Interface */
-Hashmap *hashmap_new();
+/*** Public Interface ***/
+
+/* Allocate and initialize a new Hashmap. Pass a pointer to the function used
+  to clean up any dynamic memory used by the data stored in elements of the hashmap. */
+Hashmap * hashmap_new(void (*destroy)(void* data));
+
+/* Deallocate the hashmap and all the elements within. 
+  Does NOT free the memory for the data contained within the elements */
+void hashmap_destroy(Hashmap *hm);
+ 
+/* Return a pointer to the data associated with the given key */
+void * hashmap_get(Hashmap *hm, char *key);
+
+/* Add data to the hashmap for the given key */
+i32 hashmap_put(Hashmap *hm, char *key, void *data);
+
+/* Remove the element with the given key */
+i32 hashmap_remove(Hashmap *hm, char *key);
+
 
 
 #ifdef HASHMAP_IMPLEMENTATION
 
-Hashmap *hashmap_new() {
+Hashmap *hashmap_new(void (*destroy)(void* data)) {
     Hashmap *hm = (Hashmap *)malloc(sizeof(Hashmap));
 
     hm->data = (HashmapElement *)calloc(HM_INITIAL_SIZE, sizeof(HashmapElement));
     hm->tableSize = HM_INITIAL_SIZE;
     hm->size = 0;
+    hm->destroy = destroy;
 
     return hm;
 }
@@ -184,7 +211,130 @@ u32 hashmap_get_table_index(Hashmap *hm, char *keyString){
     return key % hm->tableSize;
 }
 
+/* Returns the offset that an element with the given key should be written to */
+i32 hashmap_get_element_offset(Hashmap *hm, char *key) {
+  // If full, return immediately
+  if (hm->size >= (hm->tableSize / 2)) return HM_FULL;
 
+  // Find the best index
+  i32 curr = hashmap_get_table_index(hm, key);
+
+  // Find the next open spot within that index, or the item already matching the given key
+  for (i32 i = 0; i < HM_MAX_CHAIN_LENGTH; i++) {
+    // Empty bucket, so return it
+    if (hm->data[curr].inUse == false) {
+      return curr;
+    }
+
+    // Element with the given key already exists, so return it
+    if (hm->data[curr].inUse == true && (strcmp(hm->data[curr].key, key) == 0)) {
+      return curr;
+    }
+
+    curr = (curr + 1) % hm->tableSize;
+  }
+
+  // If we can't find an open slot in our bucket, return full
+  return HM_FULL;
+}
+
+/* Doubles the size of the existing hashmap, and rehashes all of the elements */
+i32 hashmap_rehash(Hashmap *hm) {
+  HashmapElement *temp = (HashmapElement *)calloc(2 * hm->tableSize, sizeof(HashmapElement));
+
+  HashmapElement *curr = hm->data;
+  hm->data = temp;
+
+  i32 oldSize = hm->tableSize;
+  hm->tableSize = 2 * hm->tableSize;
+  hm->size = 0;
+
+  // Rehash the elements
+  for (i32 i = 0; i < oldSize; i++) {
+    if (curr[i].inUse == false) { continue; }  
+    i32 status = hashmap_put(hm, curr[i].key, curr[i].data);
+    if (status != HM_OK) { return status; }
+  }
+
+  free(curr);
+
+  return HM_OK;
+}
+
+/* Add data to the hashmap for the given key */
+i32 hashmap_put(Hashmap *hm, char *key, void *data) {
+  i32 index = hashmap_get_element_offset(hm, key);
+  while (index == HM_FULL) {
+    if (hashmap_rehash(hm) == HM_OMEM) { return HM_OMEM; }
+    index = hashmap_get_element_offset(hm, key);
+  }
+
+  // Set the data
+  hm->data[index].data = data;
+  hm->data[index].key = key;
+  hm->data[index].inUse = true;
+  hm->size += 1;
+
+  return HM_OK;
+}
+
+/* Return a pointer to the data associated with the given key */
+void * hashmap_get(Hashmap *hm, char *key) {
+  i32 currElementIndex = hashmap_get_table_index(hm, key);
+  // Search through the bucket for the desired element
+  for (i32 i = 0; i < HM_MAX_CHAIN_LENGTH; i++) {
+    if (hm->data[currElementIndex].inUse) {
+      if (strcmp(hm->data[currElementIndex].key, key) == 0) {
+        return hm->data[currElementIndex].data;
+      }
+    }
+    currElementIndex = (currElementIndex + 1) % hm->tableSize;
+  }
+
+  // Didn't find desired element
+  return NULL;
+}
+
+/* Remove the element with the given key */
+i32 hashmap_remove(Hashmap *hm, char *key) {
+  i32 currElementIndex = hashmap_get_table_index(hm, key);
+    // Search through the bucket for the desired element
+  for (i32 i = 0; i < HM_MAX_CHAIN_LENGTH; i++) {
+    if (hm->data[currElementIndex].inUse) {
+      if (strcmp(hm->data[currElementIndex].key, key) == 0) {
+        // Blank out the fields
+        hm->data[currElementIndex].inUse = false;
+        hm->data[currElementIndex].data = NULL;
+        hm->data[currElementIndex].key = NULL;
+
+        // Reduce the size
+        hm->size -= 1;
+        return HM_OK;
+      }
+    }
+    currElementIndex = (currElementIndex + 1) % hm->tableSize;
+  }
+
+  return HM_MISSING;
+}
+
+/* Deallocate the Hashmap and all the elements within, including their data */
+void hashmap_destroy(Hashmap *hm) {
+
+  // Loop through all the elements 
+  for (i32 i = 0; i < hm->tableSize; i++) {
+    if (hm->data[i].inUse) {
+      void *elementData = hm->data[i].data;
+      if (elementData != NULL && hm->destroy != NULL) {
+        // Call the assigned function to free the dynamically allocated data
+        hm->destroy(elementData);
+      }
+    }
+  }
+
+  free(hm->data);
+  free(hm);
+}
 
 
 #endif HASHMAP_IMPLEMENTATION

@@ -31,6 +31,8 @@ typedef int64_t		i64;
 
 
 #include "list.c"
+#define HASHMAP_IMPLEMENTATION
+#include "hashmap.h"
 #include "pt_console.c"
 #include "map.c"
 #include "game.c"
