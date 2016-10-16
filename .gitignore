@@ -3,3 +3,6 @@
 *.ilk
 *.pdb
 *.suo
+*.o
+
+dark

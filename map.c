@@ -9,7 +9,7 @@
 
 
 typedef struct {
-	u32 x, y;
+	i32 x, y;
 } Point;
 
 typedef struct {
@@ -32,7 +32,7 @@ bool map_carve_room(u32 x, u32 y, u32 w, u32 h);
 void map_carve_segments(List *hallways);
 void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount);
 Point rect_random_point(PT_Rect rect);
-i32 room_containing_point(Point pt, PT_Rect *rooms, u32 roomCount);
+i32 room_containing_point(Point pt, PT_Rect *rooms, i32 roomCount);
 
 
 /* Map Management */
@@ -365,8 +365,8 @@ Point rect_random_point(PT_Rect rect) {
 	return ret;
 }
 
-i32 room_containing_point(Point pt, PT_Rect *rooms, u32 roomCount) {
-	for (i8 i = 0; i < roomCount; i++) {
+i32 room_containing_point(Point pt, PT_Rect *rooms, i32 roomCount) {
+	for (i32 i = 0; i < roomCount; i++) {
 		if ((rooms[i].x <= pt.x) && ((rooms[i].x + rooms[i].w) > pt.x) &&
 			(rooms[i].y <= pt.y) && ((rooms[i].y + rooms[i].h) > pt.y)) {
 			return i;

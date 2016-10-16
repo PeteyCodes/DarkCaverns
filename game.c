@@ -110,7 +110,7 @@ void game_object_add_component(GameObject *obj,
 	assert(obj->id != UNUSED);
 
 	switch (comp) {
-		case COMP_POSITION:
+		case COMP_POSITION: {
 			Position *pos = &positionComps[obj->id];
 			Position *posData = (Position *)compData;
 			pos->objectId = obj->id;
@@ -121,8 +121,9 @@ void game_object_add_component(GameObject *obj,
 			obj->components[comp] = pos;
 
 			break;
+		}
 
-		case COMP_VISIBILITY:
+		case COMP_VISIBILITY: {
 			Visibility *vis = &visibilityComps[obj->id];
 			Visibility *visData = (Visibility *)compData;
 			vis->objectId = obj->id;
@@ -134,8 +135,9 @@ void game_object_add_component(GameObject *obj,
 			obj->components[comp] = vis;
 
 			break;
+		}
 
-		case COMP_PHYSICAL:
+		case COMP_PHYSICAL: {
 			Physical *phys = &physicalComps[obj->id];
 			Physical *physData = (Physical *)compData;
 			phys->objectId = obj->id;
@@ -145,8 +147,9 @@ void game_object_add_component(GameObject *obj,
 			obj->components[comp] = phys;
 
 			break;
+		}
 
-		case COMP_MOVEMENT:
+		case COMP_MOVEMENT: {
 			Movement *mv = &movementComps[obj->id];
 			Movement *mvData = (Movement *)compData;
 			mv->objectId = obj->id;
@@ -157,6 +160,7 @@ void game_object_add_component(GameObject *obj,
 			obj->components[comp] = mv;
 
 			break;
+		}
 
 		default:
 			assert(1 == 0);

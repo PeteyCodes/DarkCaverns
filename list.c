@@ -152,8 +152,6 @@ Removes all elements from the given list and calls the function
 passed as destroy on the data in each element in the list.
 */
 void list_destroy(List *list) {
-	void *data;
-
 	// Remove each element
 	while (list_size(list) > 0) {
 		void *data = list_remove(list, NULL);
