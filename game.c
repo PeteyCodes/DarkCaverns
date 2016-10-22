@@ -62,6 +62,13 @@ typedef struct {
 } Movement;
 
 
+/* Level Support */
+
+typedef struct {
+	bool (*mapWalls)[MAP_HEIGHT];
+} DungeonLevel;
+
+
 /* World State */
 #define MAX_GO 	10000
 global_variable GameObject gameObjects[MAX_GO];
@@ -69,6 +76,11 @@ global_variable Position positionComps[MAX_GO];
 global_variable Visibility visibilityComps[MAX_GO];
 global_variable Physical physicalComps[MAX_GO];
 global_variable Movement movementComps[MAX_GO];
+
+global_variable DungeonLevel *currentLevel;
+global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
+
+
 
 
 /* World State Management */
@@ -232,7 +244,7 @@ void wall_add(u8 x, u8 y) {
 
 /* Level Management */
 
-Point level_get_open_point() {
+Point level_get_open_point(bool (*mapCells)[MAP_HEIGHT]) {
 	// Return a random position within the level that is open
 	for (;;) {
 		u32 x = rand() % MAP_WIDTH;
@@ -243,7 +255,7 @@ Point level_get_open_point() {
 	}
 }
 
-void level_init(GameObject *player) {
+DungeonLevel * level_init(GameObject *player) {
 	// Clear the previous level data from the world state
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if ((gameObjects[i].id != player->id) && 
@@ -253,7 +265,10 @@ void level_init(GameObject *player) {
 	}
 
 	// Generate a level map into the world state
-	map_generate();
+	bool (*mapCells)[MAP_HEIGHT] = malloc(MAP_WIDTH * MAP_HEIGHT);
+
+	map_generate(mapCells);
+
 	for (u32 x = 0; x < MAP_WIDTH; x++) {
 		for (u32 y = 0; y < MAP_HEIGHT; y++) {
 			if (mapCells[x][y]) {
@@ -264,20 +279,28 @@ void level_init(GameObject *player) {
 		}
 	}
 
+	// Create DungeonLevel Object and store relevant info
+	DungeonLevel *level = malloc(sizeof(DungeonLevel));
+	level->mapWalls = mapCells;
+
 	// Generate some monsters and drop them randomly in the level
 	// TODO: Remove hard-coding
-	Point pt = level_get_open_point();
+	Point pt = level_get_open_point(mapCells);
 	npc_add(pt.x, pt.y, LAYER_TOP, 'g', 0xaa0000ff, 1, 1);
-	pt = level_get_open_point();
+	pt = level_get_open_point(mapCells);
 	npc_add(pt.x, pt.y, LAYER_TOP, 's', 0x009900ff, 1, 1);
-	pt = level_get_open_point();
+	pt = level_get_open_point(mapCells);
 	npc_add(pt.x, pt.y, LAYER_TOP, 'k', 0x000077ff, 1, 1);
 
 	// Place our player in a random position in the level
-	pt = level_get_open_point();
+	pt = level_get_open_point(mapCells);
 	Position pos = {.objectId = player->id, .x = pt.x, .y = pt.y, .layer = LAYER_TOP};
 	game_object_add_component(player, COMP_POSITION, &pos);
+
+	return level;
 }
+
+// TODO: Need a level cleanup function 
 
 
 /* Movement System */
@@ -300,6 +323,45 @@ bool can_move(Position pos) {
 	}
 
 	return moveAllowed;
+}
+
+
+typedef struct {
+	Point target;
+	i32 weight;
+} TargetPoint;
+
+void generate_target_map() { // List *targetPoints) {
+	i32 (* dmap)[MAP_HEIGHT] = malloc(MAP_WIDTH * MAP_HEIGHT * sizeof(i32));
+	i32 UNSET = 9999;
+
+	for (i32 r = 0; r < MAP_WIDTH; r++) {
+		for (i32 c = 0; c < MAP_HEIGHT; c++) {
+			dmap[r][c] = UNSET;
+		}
+	}
+
+	bool changesMade = true;
+	while (changesMade) {
+		changesMade = false;
+
+		for (i32 r = 0; r < MAP_WIDTH; r++) {
+			for (i32 c = 0; c < MAP_HEIGHT; c++) {
+				i32 currCellValue = dmap[r][c];
+				if (currCellValue != UNSET) {
+					// Check cells around this one and update them if warranted
+					Position pos = {.x = r+1, .y = c};
+					if ((can_move(pos)) && (dmap[r+1][c] > currCellValue + 1)) {
+						dmap[r+1][c] = currCellValue + 1;
+						changesMade = true;
+					}
+					// TODO: Check other cardinal directions 
+				}
+			}
+		}
+	}
+
+	targetMap = dmap;
 }
 
 void movement_update() {

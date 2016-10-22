@@ -22,14 +22,11 @@ typedef struct {
 } Segment;
 
 
-bool mapCells[MAP_WIDTH][MAP_HEIGHT];
-
-
 /* Function Declarations */
-void map_carve_hallway_horz(Point from, Point to);
-void map_carve_hallway_vert(Point from, Point to);
-bool map_carve_room(u32 x, u32 y, u32 w, u32 h);
-void map_carve_segments(List *hallways);
+void map_carve_hallway_horz(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]);
+void map_carve_hallway_vert(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]);
+bool map_carve_room(u32 x, u32 y, u32 w, u32 h, bool (*mapCells)[MAP_HEIGHT]);
+void map_carve_segments(List *hallways, bool (*mapCells)[MAP_HEIGHT]);
 void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount);
 Point rect_random_point(PT_Rect rect);
 i32 room_containing_point(Point pt, PT_Rect *rooms, i32 roomCount);
@@ -37,7 +34,7 @@ i32 room_containing_point(Point pt, PT_Rect *rooms, i32 roomCount);
 
 /* Map Management */
 
-void map_generate() {
+void map_generate(bool (*mapCells)[MAP_HEIGHT]) {
 	// Mark all the map cells as "filled"
 	for (u32 x = 0; x < MAP_WIDTH; x++) {
 		for (u32 y = 0; y < MAP_HEIGHT; y++) {
@@ -60,7 +57,7 @@ void map_generate() {
 		if (x == 0) x = 1;
 		if (y == 0) y = 1;
 
-		bool success = map_carve_room(x, y, w, h);
+		bool success = map_carve_room(x, y, w, h, mapCells);
 		if (success) {
 			PT_Rect r = {x, y, w, h};
 			rooms[roomCount] = r;
@@ -124,13 +121,13 @@ void map_generate() {
 	}
 
 	// Carve out unique hallways
-	map_carve_segments(hallways);
+	map_carve_segments(hallways, mapCells);
 
 	// Clean up
 	list_destroy(hallways);
 }
 
-void map_carve_hallway_horz(Point from, Point to) {
+void map_carve_hallway_horz(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]) {
 	u32 first, last;
 	if (from.x < to.x) {
 		first = from.x;
@@ -145,7 +142,7 @@ void map_carve_hallway_horz(Point from, Point to) {
 	}
 }
 
-void map_carve_hallway_vert(Point from, Point to) {
+void map_carve_hallway_vert(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]) {
 	u32 first, last;
 	if (from.y < to.y) {
 		first = from.y;
@@ -160,7 +157,7 @@ void map_carve_hallway_vert(Point from, Point to) {
 	}
 }
 
-bool map_carve_room(u32 x, u32 y, u32 w, u32 h) {
+bool map_carve_room(u32 x, u32 y, u32 w, u32 h, bool (*mapCells)[MAP_HEIGHT]) {
 	// Determine if all the cells within the given rectangle are filled
 	for (u8 i = x-1; i < x + (w + 1); i++) {
 		for (u8 j = y-1; j < y + (h + 1); j++) {
@@ -180,7 +177,7 @@ bool map_carve_room(u32 x, u32 y, u32 w, u32 h) {
 	return true;
 }
 
-void map_carve_segments(List *hallways) {
+void map_carve_segments(List *hallways, bool (*mapCells)[MAP_HEIGHT]) {
 
 	for (ListElement *e = list_head(hallways); e != NULL; e = e->next) {
 		Segment *seg = (Segment *)e->data;
@@ -191,18 +188,18 @@ void map_carve_segments(List *hallways) {
 			Point p2 = seg->mid;
 
 			if (p1.x == p2.x) {
-				map_carve_hallway_vert(p1, p2);			
+				map_carve_hallway_vert(p1, p2, mapCells);			
 			} else {
-				map_carve_hallway_horz(p1, p2);
+				map_carve_hallway_horz(p1, p2, mapCells);
 			}
 
 			p1 = seg->mid;
 			p2 = seg->end;
 
 			if (p1.x == p2.x) {
-				map_carve_hallway_vert(p1, p2);			
+				map_carve_hallway_vert(p1, p2, mapCells);			
 			} else {
-				map_carve_hallway_horz(p1, p2);
+				map_carve_hallway_horz(p1, p2, mapCells);
 			}
 
 		} else {
@@ -210,9 +207,9 @@ void map_carve_segments(List *hallways) {
 			Point p2 = seg->end;
 
 			if (p1.x == p2.x) {
-				map_carve_hallway_vert(p1, p2);			
+				map_carve_hallway_vert(p1, p2, mapCells);			
 			} else {
-				map_carve_hallway_horz(p1, p2);
+				map_carve_hallway_horz(p1, p2, mapCells);
 			}
 		}
 	}
@@ -374,5 +371,3 @@ i32 room_containing_point(Point pt, PT_Rect *rooms, i32 roomCount) {
 	}
 	return -1;
 }
-
-

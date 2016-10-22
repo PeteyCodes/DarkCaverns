@@ -14,6 +14,9 @@
 #define NUM_COLS		80
 #define NUM_ROWS 		45
 
+#define FPS_LIMIT		20
+
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -119,7 +122,7 @@ int main(int argc, char *argv[]) {
 
 
 	// Create a level and place our player in it
-	level_init(player);
+	currentLevel = level_init(player);
 	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 
 	fov_calculate(playerPos->x, playerPos->y, fovMap);
@@ -132,7 +135,11 @@ int main(int argc, char *argv[]) {
 		playerMoved = false;
 
 		SDL_Event event;
+		u32 timePerFrame = 1000 / FPS_LIMIT;
+		u32 frameStart = 0;
 		while (SDL_PollEvent(&event) != 0) {
+
+			frameStart = SDL_GetTicks();
 
 			if (event.type == SDL_QUIT) {
 				done = true; 
@@ -204,6 +211,11 @@ int main(int argc, char *argv[]) {
 
 		// Have things move themselves around the dungeon if the player moved
 		if (playerMoved) {
+			// if (targetMap != NULL) {
+			// 	free(targetMap);
+			// }
+			
+			// generate_target_map();
 			movement_update();			
 		}
 
@@ -214,6 +226,12 @@ int main(int argc, char *argv[]) {
 		}
 
 		render_screen(renderer, screen, console);
+
+		// Limit our FPS
+		i32 sleepTime = timePerFrame - (SDL_GetTicks() - frameStart);
+		if (sleepTime > 0) {
+			SDL_Delay(sleepTime);
+		}
 	}
 
 	SDL_DestroyRenderer(renderer);
