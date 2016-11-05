@@ -63,6 +63,11 @@ void render_screen(SDL_Renderer *renderer,
 				visibilityComps[i].hasBeenSeen = true;
 				// Don't render if we've already written something to to this cell at a higher layer
 				if (p->layer > layerRendered[p->x][p->y]) {
+					// i32 val = targetMap[p->x][p->y] % 10;
+					// asciiChar ch = 48 + val;
+					// PT_ConsolePutCharAt(console, ch, p->x, p->y, 
+					// 					visibilityComps[i].fgColor, visibilityComps[i].bgColor);
+
 					PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
 										visibilityComps[i].fgColor, visibilityComps[i].bgColor);
 					layerRendered[p->x][p->y] = p->layer;
@@ -126,6 +131,8 @@ int main(int argc, char *argv[]) {
 	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 
 	fov_calculate(playerPos->x, playerPos->y, fovMap);
+
+	generate_target_map(playerPos->x, playerPos->y);
 
 	bool done = false;
 	bool recalculateFOV = false;
@@ -211,11 +218,12 @@ int main(int argc, char *argv[]) {
 
 		// Have things move themselves around the dungeon if the player moved
 		if (playerMoved) {
-			// if (targetMap != NULL) {
-			// 	free(targetMap);
-			// }
+			if (targetMap != NULL) {
+				free(targetMap);
+			}
 			
-			// generate_target_map();
+			Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+			generate_target_map(playerPos->x, playerPos->y);
 			movement_update();			
 		}
 

@@ -308,6 +308,8 @@ DungeonLevel * level_init(GameObject *player) {
 bool can_move(Position pos) {
 	bool moveAllowed = true;
 
+	// TODO: Make this function more performant - it's very slow
+
 	if ((pos.x >= 0) && (pos.x < NUM_COLS) && (pos.y >= 0) && (pos.y < NUM_ROWS)) {
 		for (u32 i = 0; i < MAX_GO; i++) {
 			Position p = positionComps[i];
@@ -331,31 +333,49 @@ typedef struct {
 	i32 weight;
 } TargetPoint;
 
-void generate_target_map() { // List *targetPoints) {
+bool is_wall(i32 x, i32 y) {
+	return currentLevel->mapWalls[x][y];
+}
+
+void generate_target_map(i32 targetX, i32 targetY) { // List *targetPoints) {
 	i32 (* dmap)[MAP_HEIGHT] = malloc(MAP_WIDTH * MAP_HEIGHT * sizeof(i32));
 	i32 UNSET = 9999;
 
-	for (i32 r = 0; r < MAP_WIDTH; r++) {
-		for (i32 c = 0; c < MAP_HEIGHT; c++) {
-			dmap[r][c] = UNSET;
+	for (i32 x = 0; x < MAP_WIDTH; x++) {
+		for (i32 y = 0; y < MAP_HEIGHT; y++) {
+			dmap[x][y] = UNSET;
 		}
 	}
 
+	// Set our target point(s)
+	dmap[targetX][targetY] = 0;
+
+	// Calculate our target map
 	bool changesMade = true;
 	while (changesMade) {
 		changesMade = false;
 
-		for (i32 r = 0; r < MAP_WIDTH; r++) {
-			for (i32 c = 0; c < MAP_HEIGHT; c++) {
-				i32 currCellValue = dmap[r][c];
+		for (i32 x = 0; x < MAP_WIDTH; x++) {
+			for (i32 y = 0; y < MAP_HEIGHT; y++) {
+				i32 currCellValue = dmap[x][y];
 				if (currCellValue != UNSET) {
 					// Check cells around this one and update them if warranted
-					Position pos = {.x = r+1, .y = c};
-					if ((can_move(pos)) && (dmap[r+1][c] > currCellValue + 1)) {
-						dmap[r+1][c] = currCellValue + 1;
+					if ((!is_wall(x+1, y)) && (dmap[x+1][y] > currCellValue + 1)) { 
+						dmap[x+1][y] = currCellValue + 1;
 						changesMade = true;
 					}
-					// TODO: Check other cardinal directions 
+					if ((!is_wall(x-1, y)) && (dmap[x-1][y] > currCellValue + 1)) { 
+						dmap[x-1][y] = currCellValue + 1;
+						changesMade = true;
+					}
+					if ((!is_wall(x, y-1)) && (dmap[x][y-1] > currCellValue + 1)) { 
+						dmap[x][y-1] = currCellValue + 1;
+						changesMade = true;
+					}
+					if ((!is_wall(x, y+1)) && (dmap[x][y+1] > currCellValue + 1)) { 
+						dmap[x][y+1] = currCellValue + 1;
+						changesMade = true;
+					}
 				}
 			}
 		}
@@ -377,13 +397,16 @@ void movement_update() {
 				Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
 				Position newPos = {.objectId = p->objectId, .x = p->x, .y = p->y, .layer = p->layer};
 
-				// Determine new position
-				// TODO: Come up with a more intelligent way to do this. For now, just pick random direction.
-				u32 dir = rand() % 4;
-				if (dir == 0) { newPos.x -= 1; }
-				else if (dir == 1) { newPos.y -= 1; }
-				else if (dir == 2) { newPos.x += 1; }
-				else { newPos.y += 1; }
+				// TODO: A monster should only move toward the player if they have seen the player
+
+				// TODO: Evaluate all cardinal direction cells and pick randomly between optimal moves
+
+				// Determine new position based on our target map
+				i32 currTargetValue = targetMap[p->x][p->y];
+				if (targetMap[p->x - 1][p->y] < currTargetValue) { newPos.x -= 1; }
+				else if (targetMap[p->x][p->y - 1] < currTargetValue) { newPos.y -= 1; }
+				else if (targetMap[p->x + 1][p->y] < currTargetValue) { newPos.x += 1; }
+				else if (targetMap[p->x][p->y + 1] < currTargetValue) { newPos.y += 1; }
 
 				// Test to see if the new position can be moved to
 				if (can_move(newPos)) {
