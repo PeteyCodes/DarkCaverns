@@ -21,8 +21,6 @@ float fov_distance_between(u32 x1, u32 y1, u32 x2, u32 y2);
 float line_slope_between(float x1, float y1, float x2, float y2);
 FovCell map_cell_for_local_cell(u8 sector, FovCell heroMapCell, FovCell cellToTranslate);
 
-global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
-
 internal Shadow knownShadows[10];
 internal u8 shadowCount = 0;
 

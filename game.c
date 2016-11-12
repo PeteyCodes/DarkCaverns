@@ -59,6 +59,8 @@ typedef struct {
 	u8 ticksUntilNextMove;	// Countdown to next move. Moves when = 0.
 	Point destination;
 	bool hasDestination;
+	bool chasingPlayer;
+	u32 turnsSincePlayerSeen;
 } Movement;
 
 
@@ -78,10 +80,8 @@ global_variable Physical physicalComps[MAX_GO];
 global_variable Movement movementComps[MAX_GO];
 
 global_variable DungeonLevel *currentLevel;
+global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
 global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
-
-
-
 
 /* World State Management */
 void world_state_init() {
@@ -168,6 +168,8 @@ void game_object_add_component(GameObject *obj,
 			mv->speed = mvData->speed;
 			mv->frequency = mvData->frequency;
 			mv->ticksUntilNextMove = mvData->ticksUntilNextMove;
+			mv->chasingPlayer = mvData->chasingPlayer;
+			mv->turnsSincePlayerSeen = mvData->turnsSincePlayerSeen;
 
 			obj->components[comp] = mv;
 
@@ -227,7 +229,8 @@ void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 
 	game_object_add_component(npc, COMP_VISIBILITY, &vis);
 	Physical phys = {.objectId = npc->id, .blocksMovement = true, .blocksSight = false};
 	game_object_add_component(npc, COMP_PHYSICAL, &phys);
-	Movement mv = {.objectId = npc->id, .speed = speed, .frequency = frequency, .ticksUntilNextMove = frequency};
+	Movement mv = {.objectId = npc->id, .speed = speed, .frequency = frequency, .ticksUntilNextMove = frequency, 
+		.chasingPlayer = false, .turnsSincePlayerSeen = 0};
 	game_object_add_component(npc, COMP_MOVEMENT, &mv);
 }
 
@@ -397,16 +400,76 @@ void movement_update() {
 				Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
 				Position newPos = {.objectId = p->objectId, .x = p->x, .y = p->y, .layer = p->layer};
 
-				// TODO: A monster should only move toward the player if they have seen the player
+				// A monster should only move toward the player if they have seen the player
+				// Should give chase if player is currently in view or has been in view in the last 5 turns
 
-				// TODO: Evaluate all cardinal direction cells and pick randomly between optimal moves
+				// If the player can see the monster, the monster can see the player
+				bool giveChase = false;
+				if (fovMap[p->x][p->y] > 0) {
+					// Player is visible
+					giveChase = true;
+					mv->chasingPlayer = true;
+					mv->turnsSincePlayerSeen = 0;
+				} else {
+					// Player is not visible - see if monster should still chase
+					giveChase = mv->chasingPlayer;
+					mv->turnsSincePlayerSeen += 1;
+					if (mv->turnsSincePlayerSeen > 5) {
+						mv->chasingPlayer = false;
+					}
+				}
 
 				// Determine new position based on our target map
-				i32 currTargetValue = targetMap[p->x][p->y];
-				if (targetMap[p->x - 1][p->y] < currTargetValue) { newPos.x -= 1; }
-				else if (targetMap[p->x][p->y - 1] < currTargetValue) { newPos.y -= 1; }
-				else if (targetMap[p->x + 1][p->y] < currTargetValue) { newPos.x += 1; }
-				else if (targetMap[p->x][p->y + 1] < currTargetValue) { newPos.y += 1; }
+				if (giveChase) {
+					// Evaluate all cardinal direction cells and pick randomly between optimal moves 
+					Position moves[4];
+					i32 moveCount = 0;
+					i32 currTargetValue = targetMap[p->x][p->y];
+					if (targetMap[p->x - 1][p->y] < currTargetValue) {
+						Position np = newPos;
+						np.x -= 1;	
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+					if (targetMap[p->x][p->y - 1] < currTargetValue) { 
+						Position np = newPos;
+						np.y -= 1;						
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+					if (targetMap[p->x + 1][p->y] < currTargetValue) { 
+						Position np = newPos;
+						np.x += 1;						
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+					if (targetMap[p->x][p->y + 1] < currTargetValue) { 
+						Position np = newPos;
+						np.y += 1;						
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+
+					u32 moveIdx = rand() % moveCount;
+					newPos = moves[moveIdx];
+
+				} else {
+					// Move randomly?
+					u32 dir = rand() % 4;
+					switch (dir) {
+						case 0:
+							newPos.x -= 1;
+							break;
+						case 1:
+							newPos.y -= 1;
+							break;
+						case 2:
+							newPos.x += 1;
+							break;
+						default:
+							newPos.y += 1;
+					}
+				}
 
 				// Test to see if the new position can be moved to
 				if (can_move(newPos)) {

@@ -95,6 +95,22 @@ bool list_insert_after(List *list, ListElement *element, void *data) {
 	return true;
 }
 
+void * list_item_at(List *list, u32 index) {
+	void * data = NULL;
+	u32 currIdx = 0;
+	ListElement *currElement = list->head;
+
+	while (currElement != NULL)	{
+		if (currIdx == index) {
+			return currElement;
+		}
+		currIdx += 1;
+		currElement = currElement->next;
+	}
+
+	return NULL;
+}
+
 /*
 Removes the given element. If element is NULL, removes the head of the list. 
 Returns a pointer to the data stored in the element, or NULL on failure.
