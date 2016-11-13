@@ -56,34 +56,28 @@ void render_screen(SDL_Renderer *renderer,
 		}
 	}
 
-	for (u32 i = 0; i < MAX_GO; i++) {
-		if (visibilityComps[i].objectId != UNUSED) {
-			Position *p = (Position *)game_object_get_component(&gameObjects[i], COMP_POSITION);
-			if (fovMap[p->x][p->y] > 0) {
-				visibilityComps[i].hasBeenSeen = true;
-				// Don't render if we've already written something to to this cell at a higher layer
-				if (p->layer > layerRendered[p->x][p->y]) {
-					// i32 val = targetMap[p->x][p->y] % 10;
-					// asciiChar ch = 48 + val;
-					// PT_ConsolePutCharAt(console, ch, p->x, p->y, 
-					// 					visibilityComps[i].fgColor, visibilityComps[i].bgColor);
+	ListElement *e = list_head(visibilityComps);
+	while (e != NULL) {
+		Visibility *vis = (Visibility *)list_data(e);
+		Position *p = (Position *)game_object_get_component(&gameObjects[vis->objectId], COMP_POSITION);
+		if (fovMap[p->x][p->y] > 0) {
+			vis->hasBeenSeen = true;
+			// Don't render if we've already written something to to this cell at a higher layer
+			if (p->layer > layerRendered[p->x][p->y]) {
+				PT_ConsolePutCharAt(console, vis->glyph, p->x, p->y, vis->fgColor, vis->bgColor);
+				layerRendered[p->x][p->y] = p->layer;
+			}
 
-					PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
-										visibilityComps[i].fgColor, visibilityComps[i].bgColor);
-					layerRendered[p->x][p->y] = p->layer;
-				}
-
-			} else if (visibilityComps[i].visibleOutsideFOV && visibilityComps[i].hasBeenSeen) {
-				u32 fullColor = visibilityComps[i].fgColor;
-				u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
-				// Don't render if we've already written something to to this cell at a higher layer
-				if (p->layer > layerRendered[p->x][p->y]) {
-					PT_ConsolePutCharAt(console, visibilityComps[i].glyph, p->x, p->y, 
-										fadedColor, 0x000000FF);
-					layerRendered[p->x][p->y] = p->layer;
-				}
+		} else if (vis->visibleOutsideFOV && vis->hasBeenSeen) {
+			u32 fullColor = vis->fgColor;
+			u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
+			// Don't render if we've already written something to to this cell at a higher layer
+			if (p->layer > layerRendered[p->x][p->y]) {
+				PT_ConsolePutCharAt(console, vis->glyph, p->x, p->y, fadedColor, 0x000000FF);
+				layerRendered[p->x][p->y] = p->layer;
 			}
 		}
+		e = list_next(e);
 	}
 
 	SDL_UpdateTexture(screen, NULL, console->pixels, SCREEN_WIDTH * sizeof(u32));
@@ -121,9 +115,9 @@ int main(int argc, char *argv[]) {
 
 	GameObject *player = game_object_create();
 	Visibility vis = {player->id, '@', 0x00FF00FF, 0x00000000};
-	game_object_add_component(player, COMP_VISIBILITY, &vis);
+	game_object_update_component(player, COMP_VISIBILITY, &vis);
 	Physical phys = {player->id, true, true};
-	game_object_add_component(player, COMP_PHYSICAL, &phys);
+	game_object_update_component(player, COMP_PHYSICAL, &phys);
 
 
 	// Create a level and place our player in it
@@ -173,7 +167,7 @@ int main(int argc, char *argv[]) {
 					case SDLK_UP: {
 						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1, LAYER_TOP};
 						if (can_move(newPos)) {
-							game_object_add_component(player, COMP_POSITION, &newPos);
+							game_object_update_component(player, COMP_POSITION, &newPos);
 							recalculateFOV = true;					
 							playerMoved = true;		
 						}
@@ -183,7 +177,7 @@ int main(int argc, char *argv[]) {
 					case SDLK_DOWN: {
 						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1, LAYER_TOP};
 						if (can_move(newPos)) {
-							game_object_add_component(player, COMP_POSITION, &newPos);							
+							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
 						}
@@ -193,7 +187,7 @@ int main(int argc, char *argv[]) {
 					case SDLK_LEFT: {
 						Position newPos = {playerPos->objectId, playerPos->x - 1, playerPos->y, LAYER_TOP};
 						if (can_move(newPos)) {
-							game_object_add_component(player, COMP_POSITION, &newPos);							
+							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
 						}
@@ -203,7 +197,7 @@ int main(int argc, char *argv[]) {
 					case SDLK_RIGHT: {
 						Position newPos = {playerPos->objectId, playerPos->x + 1, playerPos->y, LAYER_TOP};
 						if (can_move(newPos)) {
-							game_object_add_component(player, COMP_POSITION, &newPos);							
+							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
 						}

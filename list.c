@@ -163,6 +163,24 @@ void * list_remove(List *list, ListElement *element) {
 	return data;
 }
 
+
+/* 
+Returns the element containing the given data. Returns NULL if no elements
+in the list contain the given data.
+*/
+ListElement * list_search(List *list, void * data) {
+	ListElement *currElement = list->head;
+
+	while (currElement != NULL)	{
+		if (currElement->data == data) {
+			return currElement;
+		}
+		currElement = currElement->next;
+	}
+
+	return NULL;
+}
+
 /*
 Removes all elements from the given list and calls the function 
 passed as destroy on the data in each element in the list.
