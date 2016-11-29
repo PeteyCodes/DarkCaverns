@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <SDL2/SDL.h>
 
@@ -34,6 +35,7 @@ typedef int64_t		i64;
 
 
 #include "list.c"
+#include "config.c"
 #define HASHMAP_IMPLEMENTATION
 #include "hashmap.h"
 #include "pt_console.c"
@@ -212,10 +214,6 @@ int main(int argc, char *argv[]) {
 
 		// Have things move themselves around the dungeon if the player moved
 		if (playerMoved) {
-			if (targetMap != NULL) {
-				free(targetMap);
-			}
-			
 			Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 			generate_target_map(playerPos->x, playerPos->y);
 			movement_update();			

@@ -103,13 +103,21 @@ void add_shadow(Shadow s) {
 }
 
 bool cell_blocks_sight(u32 x, u32 y) {
-	GameObject *go = game_object_at_position(x, y);
-	if (go != NULL) {
-		Physical *phys = (Physical *)game_object_get_component(go, COMP_PHYSICAL);
-		if (phys->blocksSight) {
-			return true;
+	List *gos = game_objects_at_position(x, y);
+	if (gos != NULL) {
+		ListElement *e = list_head(gos);
+		while (e != NULL) {
+			GameObject *go = (GameObject *)list_data(e);
+			Physical *phys = (Physical *)game_object_get_component(go, COMP_PHYSICAL);
+			if (phys->blocksSight) {
+				return true;
+			}
+
+			e = list_next(e);
 		}
+
 	}
+
 	return false;
 }
 

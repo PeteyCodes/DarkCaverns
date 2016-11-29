@@ -82,6 +82,8 @@ global_variable List *movementComps;
 global_variable DungeonLevel *currentLevel;
 global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
 global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
+global_variable List *goPositions[MAP_WIDTH][MAP_HEIGHT];
+
 
 /* World State Management */
 void world_state_init() {
@@ -126,6 +128,10 @@ void game_object_update_component(GameObject *obj,
 			Position *pos = obj->components[COMP_POSITION];
 			if (pos == NULL) {
 				pos = (Position *)malloc(sizeof(Position));
+			} else {
+				// Remove game obj from the position helper DS
+				List *ls = goPositions[pos->x][pos->y];
+				list_remove_element_with_data(ls, obj);
 			}
 			Position *posData = (Position *)compData;
 			pos->objectId = obj->id;
@@ -135,6 +141,14 @@ void game_object_update_component(GameObject *obj,
 
 			list_insert_after(positionComps, NULL, pos);
 			obj->components[comp] = pos;
+
+			// Update our helper DS 
+			List *gos = goPositions[posData->x][posData->y];
+			if (gos == NULL) {
+				gos = list_init(free);
+				goPositions[posData->x][posData->y] = gos;
+			}
+			list_insert_after(gos, NULL, obj);
 
 			break;
 		}
@@ -223,18 +237,8 @@ void *game_object_get_component(GameObject *obj,
 	return obj->components[comp];
 }
 
-
-GameObject *game_object_at_position(u32 x, u32 y) {
-	ListElement *e = list_head(positionComps);
-	while (e != NULL) {
-		Position *p = (Position *)list_data(e);
-		if (p->x == x && p->y == y) {
-			return &gameObjects[p->objectId];
-		}		
-		e = list_next(e);
-	}
-
-	return NULL;
+List *game_objects_at_position(u32 x, u32 y) {
+	return goPositions[x][y];
 }
 
 
@@ -371,7 +375,13 @@ bool is_wall(i32 x, i32 y) {
 	return currentLevel->mapWalls[x][y];
 }
 
+// TODO: Allow for a list of target points to be provided, with differing starting weights/priorities?
 void generate_target_map(i32 targetX, i32 targetY) { // List *targetPoints) {
+	// Clean up any previously generated target map
+	if (targetMap != NULL) {
+		free(targetMap);
+	}
+
 	i32 (* dmap)[MAP_HEIGHT] = malloc(MAP_WIDTH * MAP_HEIGHT * sizeof(i32));
 	i32 UNSET = 9999;
 
