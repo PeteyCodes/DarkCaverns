@@ -90,10 +90,10 @@ void world_state_init() {
 	for (u32 i = 0; i < MAX_GO; i++) {
 		gameObjects[i].id = UNUSED;
 	}
-	positionComps = list_init(free);
-	visibilityComps = list_init(free);
-	physicalComps = list_init(free);
-	movementComps = list_init(free);
+	positionComps = list_new(free);
+	visibilityComps = list_new(free);
+	physicalComps = list_new(free);
+	movementComps = list_new(free);
 }
 
 
@@ -145,7 +145,7 @@ void game_object_update_component(GameObject *obj,
 			// Update our helper DS 
 			List *gos = goPositions[posData->x][posData->y];
 			if (gos == NULL) {
-				gos = list_init(free);
+				gos = list_new(free);
 				goPositions[posData->x][posData->y] = gos;
 			}
 			list_insert_after(gos, NULL, obj);

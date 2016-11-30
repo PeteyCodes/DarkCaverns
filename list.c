@@ -37,13 +37,13 @@ Access the data for the given element
 #define list_prev(element) ((element)->prev)
 
 /*
-list_init must be called before a List can be used.
+list_new creates a new List and must be called before the list can be used.
 Pass a pointer to a function that will clean up dynamically allocated
 memory used by the data contained in list elements. 
 e.g. for malloc, send a pointer to free. For data that shouldn't be cleaned
 up, send NULL.
 */
-List * list_init(void (*destroy)(void* data)) {
+List * list_new(void (*destroy)(void* data)) {
 	List *list = malloc(sizeof(List));
 
 	if (list != NULL) {

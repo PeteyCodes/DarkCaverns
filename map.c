@@ -72,14 +72,14 @@ void map_generate(bool (*mapCells)[MAP_HEIGHT]) {
 	}
 
 	// Join all rooms with corridors, so that all rooms are reachable
-	List *hallways = list_init(free);
+	List *hallways = list_new(free);
 
 	for (u32 r = 1; r < roomCount; r++) {
 		// Join two rooms via random points in those rooms
 		Point fromPt = rect_random_point(rooms[r-1]);
 		Point toPt = rect_random_point(rooms[r]);
 
-		List *segments = list_init(free);
+		List *segments = list_new(free);
 
 		// Break the proposed hallway into segments joining rooms
 		map_get_segments(segments, fromPt, toPt, rooms, roomCount);
