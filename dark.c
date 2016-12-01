@@ -33,7 +33,7 @@ typedef int64_t		i64;
 #define local_persist static
 #define global_variable static
 
-
+#include "util.c"
 #include "list.c"
 #include "config.c"
 // #define HASHMAP_IMPLEMENTATION

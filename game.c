@@ -83,7 +83,7 @@ global_variable DungeonLevel *currentLevel;
 global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
 global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
 global_variable List *goPositions[MAP_WIDTH][MAP_HEIGHT];
-
+global_variable Config *monsterConfig = NULL;
 
 /* World State Management */
 void world_state_init() {
@@ -94,6 +94,9 @@ void world_state_init() {
 	visibilityComps = list_new(free);
 	physicalComps = list_new(free);
 	movementComps = list_new(free);
+
+	// Parse necessary config files into memory
+	monsterConfig = config_file_parse("monsters.cfg");
 }
 
 
@@ -320,16 +323,26 @@ DungeonLevel * level_init(GameObject *player) {
 	level->mapWalls = mapCells;
 
 	// Generate some monsters and drop them randomly in the level
-	// TODO: Remove hard-coding
-	Point pt = level_get_open_point(mapCells);
-	npc_add(pt.x, pt.y, LAYER_TOP, 'g', 0xaa0000ff, 1, 1);
-	pt = level_get_open_point(mapCells);
-	npc_add(pt.x, pt.y, LAYER_TOP, 's', 0x009900ff, 1, 1);
-	pt = level_get_open_point(mapCells);
-	npc_add(pt.x, pt.y, LAYER_TOP, 'k', 0x000077ff, 1, 1);
+	ListElement *e = list_head(monsterConfig->entities);
+	while (e != NULL) {
+		ConfigEntity *entity = (ConfigEntity *)e->data;
+		Point pt = level_get_open_point(mapCells);
+		char *glyph = config_entity_value(entity, "vis_glyph");
+		asciiChar g = *glyph;
+		char *color = config_entity_value(entity, "vis_color");
+		u32 c = xtoi(color);
+		char *speed = config_entity_value(entity, "mv_speed");
+		u32 s = atoi(speed);
+		char *freq = config_entity_value(entity, "mv_frequency");
+		u32 f = atoi(freq);
+
+		npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f);
+
+		e = list_next(e);
+	}
 
 	// Place our player in a random position in the level
-	pt = level_get_open_point(mapCells);
+	Point pt = level_get_open_point(mapCells);
 	Position pos = {.objectId = player->id, .x = pt.x, .y = pt.y, .layer = LAYER_TOP};
 	game_object_update_component(player, COMP_POSITION, &pos);
 
