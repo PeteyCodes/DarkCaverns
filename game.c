@@ -10,6 +10,8 @@
 #define LAYER_AIR		3
 #define LAYER_TOP		4
 
+#define MONSTER_TYPE_COUNT	100
+#define MAX_DUNGEON_LEVEL	20
 
 typedef enum {
 	COMP_POSITION = 0,
@@ -67,6 +69,7 @@ typedef struct {
 /* Level Support */
 
 typedef struct {
+	i32 level;
 	bool (*mapWalls)[MAP_HEIGHT];
 } DungeonLevel;
 
@@ -84,6 +87,8 @@ global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
 global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
 global_variable List *goPositions[MAP_WIDTH][MAP_HEIGHT];
 global_variable Config *monsterConfig = NULL;
+global_variable i32 monsterProbability[MONSTER_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
+
 
 /* World State Management */
 void world_state_init() {
@@ -97,6 +102,39 @@ void world_state_init() {
 
 	// Parse necessary config files into memory
 	monsterConfig = config_file_parse("monsters.cfg");
+
+	// Generate our monster appearance probability data
+	ListElement *e = list_head(monsterConfig->entities);
+	while (e != NULL) {
+		ConfigEntity *entity = (ConfigEntity *)e->data;
+		char *appearance_prob = config_entity_value(entity, "appearance_prob");
+		char *copy = malloc(strlen(appearance_prob) + 1);
+
+		char *monsterId = config_entity_value(entity, "monster_id");
+		i32 monId = atoi(monsterId);
+
+		bool probData = true;
+		while (probData) {
+			char *lvl = strtok(copy, ",");
+			if (lvl != NULL) {
+				char *prob = strtok(NULL, ",");
+				i32 lvlNum = atoi(lvl);
+				i32 probNum = atoi(prob);	
+				
+				monsterProbability[monId-1][lvlNum - 1] = probNum;			
+				
+			} else {
+				probData = false;
+				break;
+			}
+		}
+
+		free(copy);
+		e = list_next(e);
+	}
+
+	// TODO: Other one-time data generation using config data?
+
 }
 
 
@@ -294,7 +332,29 @@ Point level_get_open_point(bool (*mapCells)[MAP_HEIGHT]) {
 	}
 }
 
-DungeonLevel * level_init(GameObject *player) {
+// TODO: Move this somewhere appropriate
+i32 monster_for_level(i32 level) {
+	// TODO: Implement this
+	return 1;
+}
+
+ConfigEntity * get_monster_config(Config *config, i32 id) {
+	ListElement *e = list_head(config->entities);
+	while (e != NULL) {
+		ConfigEntity *entity = (ConfigEntity *)e->data;
+		i32 monsterId = atoi(config_entity_value(entity, "monster_id"));
+		if (monsterId == id) {
+			return entity;
+		}
+
+		e = list_next(e);
+	}
+
+	return NULL;
+}
+
+
+DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	// Clear the previous level data from the world state
 	for (u32 i = 0; i < MAX_GO; i++) {
 		if ((gameObjects[i].id != player->id) && 
@@ -320,27 +380,32 @@ DungeonLevel * level_init(GameObject *player) {
 
 	// Create DungeonLevel Object and store relevant info
 	DungeonLevel *level = malloc(sizeof(DungeonLevel));
+	level->level = levelToGenerate;
 	level->mapWalls = mapCells;
 
-	// Generate some monsters and drop them randomly in the level
-	ListElement *e = list_head(monsterConfig->entities);
-	while (e != NULL) {
-		ConfigEntity *entity = (ConfigEntity *)e->data;
-		Point pt = level_get_open_point(mapCells);
-		char *glyph = config_entity_value(entity, "vis_glyph");
-		asciiChar g = *glyph;
-		char *color = config_entity_value(entity, "vis_color");
-		u32 c = xtoi(color);
-		char *speed = config_entity_value(entity, "mv_speed");
-		u32 s = atoi(speed);
-		char *freq = config_entity_value(entity, "mv_frequency");
-		u32 f = atoi(freq);
+	// TODO: Grab the actual number of monsters to generate for this level from level config
+	i32 monstersToAdd = 10;
+	for (i32 i = 0; i < monstersToAdd; i++) {
+		// Consult our monster appearance data to determine what monster to generate.
+		i32 monsterId = monster_for_level(levelToGenerate);
+		ConfigEntity *monsterEntity = get_monster_config(monsterConfig, monsterId);
 
-		npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f);
+		if (monsterConfig != NULL) {
+			// Add the monster		
+			Point pt = level_get_open_point(mapCells);
+			char *glyph = config_entity_value(monsterEntity, "vis_glyph");
+			asciiChar g = *glyph;
+			char *color = config_entity_value(monsterEntity, "vis_color");
+			u32 c = xtoi(color);
+			char *speed = config_entity_value(monsterEntity, "mv_speed");
+			u32 s = atoi(speed);
+			char *freq = config_entity_value(monsterEntity, "mv_frequency");
+			u32 f = atoi(freq);
 
-		e = list_next(e);
+			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f);
+		}
 	}
-
+	
 	// Place our player in a random position in the level
 	Point pt = level_get_open_point(mapCells);
 	Position pos = {.objectId = player->id, .x = pt.x, .y = pt.y, .layer = LAYER_TOP};
@@ -348,6 +413,8 @@ DungeonLevel * level_init(GameObject *player) {
 
 	return level;
 }
+
+
 
 // TODO: Need a level cleanup function 
 

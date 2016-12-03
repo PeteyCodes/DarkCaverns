@@ -123,7 +123,9 @@ int main(int argc, char *argv[]) {
 
 
 	// Create a level and place our player in it
-	currentLevel = level_init(player);
+	// TODO: Hand this fn the actual level number we should generate.
+	i32 currentLevelNumber = 1;
+	currentLevel = level_init(currentLevelNumber, player);
 	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 
 	fov_calculate(playerPos->x, playerPos->y, fovMap);
@@ -158,7 +160,7 @@ int main(int argc, char *argv[]) {
 
 					// DEBUG
 					case SDLK_m:
-						level_init(player);
+						level_init(currentLevelNumber, player);
 						break;
 					// END DEBUG
 
