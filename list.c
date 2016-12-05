@@ -132,7 +132,7 @@ void * list_remove(List *list, ListElement *element) {
 		}
 
 	} else {
-		data = element->next->data;
+		data = element->data;
 		elementToRemove = element;
 
 		ListElement *prevElement = element->prev;

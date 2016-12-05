@@ -88,6 +88,8 @@ global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
 global_variable List *goPositions[MAP_WIDTH][MAP_HEIGHT];
 global_variable Config *monsterConfig = NULL;
 global_variable i32 monsterProbability[MONSTER_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
+global_variable Config *levelConfig = NULL;
+global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
 
 
 /* World State Management */
@@ -102,35 +104,76 @@ void world_state_init() {
 
 	// Parse necessary config files into memory
 	monsterConfig = config_file_parse("monsters.cfg");
+	levelConfig = config_file_parse("levels.cfg");
 
 	// Generate our monster appearance probability data
 	ListElement *e = list_head(monsterConfig->entities);
 	while (e != NULL) {
 		ConfigEntity *entity = (ConfigEntity *)e->data;
 		char *appearance_prob = config_entity_value(entity, "appearance_prob");
-		char *copy = malloc(strlen(appearance_prob) + 1);
+		char *copy = (char *)malloc(strlen(appearance_prob) + 1);
+		strcpy(copy, appearance_prob);
 
 		char *monsterId = config_entity_value(entity, "monster_id");
 		i32 monId = atoi(monsterId);
 
-		bool probData = true;
-		while (probData) {
-			char *lvl = strtok(copy, ",");
-			if (lvl != NULL) {
+		char *lvl = strtok(copy, ",");
+		if (lvl != NULL) {
+			i32 lastLvl = 0;
+			bool probData = true;
+			while (probData) {
 				char *prob = strtok(NULL, ",");
 				i32 lvlNum = atoi(lvl);
 				i32 probNum = atoi(prob);	
-				
-				monsterProbability[monId-1][lvlNum - 1] = probNum;			
-				
-			} else {
-				probData = false;
-				break;
+
+				// Fill in the probabilities from our last filled level to the current level
+				for (i32 i = lastLvl; i < lvlNum; i++) {
+					monsterProbability[monId-1][i] = probNum;							
+				}				
+
+				lastLvl = lvlNum;
+				lvl = strtok(NULL, ",");
+				if (lvl == NULL) {
+					probData = false;
+				}
 			}
 		}
 
 		free(copy);
 		e = list_next(e);
+	}
+
+	// Generate our level config data
+	e = list_head(levelConfig->entities);
+	if (e != NULL) {
+		ConfigEntity *levelEntity = (ConfigEntity *)e->data;
+		char *lvlMonsters = config_entity_value(levelEntity, "max_monsters");
+		char *copy = (char *)malloc(strlen(lvlMonsters) + 1);
+		strcpy(copy, lvlMonsters);
+
+		char *lvl = strtok(copy, ",");
+		if (lvl != NULL) {
+			i32 lastLvl = 0;
+			bool lvlMonData = true;
+			while (lvlMonData) {
+				char *monCount = strtok(NULL, ",");
+				i32 lvlNum = atoi(lvl);
+				i32 maxMon = atoi(monCount);
+
+				// Fill in the probabilities from our last filled level to the current level
+				for (i32 i = lastLvl; i < lvlNum; i++) {
+					maxMonsters[i] = maxMon;
+				}				
+
+				lastLvl = lvlNum;
+				lvl = strtok(NULL, ",");
+				if (lvl == NULL) {
+					lvlMonData = false;
+				}
+			}
+		}
+
+		free(copy);
 	}
 
 	// TODO: Other one-time data generation using config data?
@@ -356,7 +399,8 @@ ConfigEntity * get_monster_config(Config *config, i32 id) {
 
 DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	// Clear the previous level data from the world state
-	for (u32 i = 0; i < MAX_GO; i++) {
+	// Note: We start at index 1 because the player is at index 0 and we want to keep them!
+	for (u32 i = 1; i < MAX_GO; i++) {
 		if ((gameObjects[i].id != player->id) && 
 			(gameObjects[i].id != UNUSED)) {
 			game_object_destroy(&gameObjects[i]);

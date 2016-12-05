@@ -160,7 +160,12 @@ int main(int argc, char *argv[]) {
 
 					// DEBUG
 					case SDLK_m:
+						// Restart a new level with a new map
 						level_init(currentLevelNumber, player);
+						playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+						fov_calculate(playerPos->x, playerPos->y, fovMap);
+						generate_target_map(playerPos->x, playerPos->y);
+
 						break;
 					// END DEBUG
 
