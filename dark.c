@@ -120,7 +120,10 @@ int main(int argc, char *argv[]) {
 	game_object_update_component(player, COMP_VISIBILITY, &vis);
 	Physical phys = {player->id, true, true};
 	game_object_update_component(player, COMP_PHYSICAL, &phys);
-
+	Health hlth = {.objectId = player->id, .currentHP = 20, .maxHP = 20, .recoveryRate = 1};
+	game_object_update_component(player, COMP_HEALTH, &hlth);
+	Combat com = {.objectId = player->id, .attack = 2, .defense = 2};
+	game_object_update_component(player, COMP_COMBAT, &com);
 
 	// Create a level and place our player in it
 	// TODO: Hand this fn the actual level number we should generate.
@@ -179,7 +182,7 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);
 							recalculateFOV = true;					
 							playerMoved = true;		
-						}
+						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
 					}
 					break;
 
@@ -189,7 +192,7 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
-						}
+						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
 					}
 					break;
 
@@ -199,7 +202,7 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
-						}
+						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
 					}
 					break;
 
@@ -209,7 +212,7 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
-						}
+						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
 					}
 					break;
 

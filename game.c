@@ -19,6 +19,7 @@ typedef enum {
 	COMP_PHYSICAL,
 	COMP_HEALTH,
 	COMP_MOVEMENT,
+	COMP_COMBAT,
 
 	/* Define other components above here */
 	COMPONENT_COUNT
@@ -65,6 +66,19 @@ typedef struct {
 	i32 turnsSincePlayerSeen;
 } Movement;
 
+typedef struct {
+	i32 objectId;
+	i32 currentHP;
+	i32 maxHP;
+	i32 recoveryRate;		// HP recovered per tick.
+} Health;
+
+typedef struct {
+	i32 objectId;
+	i32 attack;				// attack = damage inflicted per hit
+	i32 defense;			// defense = damage absorbed before HP is affected
+} Combat;
+
 
 /* Level Support */
 
@@ -81,6 +95,8 @@ global_variable List *positionComps;
 global_variable List *visibilityComps;
 global_variable List *physicalComps;
 global_variable List *movementComps;
+global_variable List *healthComps;
+global_variable List *combatComps;
 
 global_variable DungeonLevel *currentLevel;
 global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
@@ -101,6 +117,8 @@ void world_state_init() {
 	visibilityComps = list_new(free);
 	physicalComps = list_new(free);
 	movementComps = list_new(free);
+	healthComps = list_new(free);
+	combatComps = list_new(free);
 
 	// Parse necessary config files into memory
 	monsterConfig = config_file_parse("monsters.cfg");
@@ -291,6 +309,39 @@ void game_object_update_component(GameObject *obj,
 			break;
 		}
 
+		case COMP_HEALTH: {
+			Health *hlth = obj->components[COMP_HEALTH];
+			if (hlth == NULL) {
+				hlth = (Health *)malloc(sizeof(Health));
+			}
+			Health *hlthData = (Health *)compData;
+			hlth->objectId = obj->id;
+			hlth->currentHP = hlthData->currentHP;
+			hlth->maxHP = hlthData->maxHP;
+			hlth->recoveryRate = hlthData->recoveryRate;
+
+			list_insert_after(healthComps, NULL, hlth);
+			obj->components[comp] = hlth;
+
+			break;
+		}
+
+		case COMP_COMBAT: {
+			Combat *com = obj->components[COMP_COMBAT];
+			if (com == NULL) {
+				com = (Combat *)malloc(sizeof(Combat));
+			}
+			Combat *combatData = (Combat *)compData;
+			com->objectId = obj->id;
+			com->attack = combatData->attack;
+			com->defense = combatData->defense;
+
+			list_insert_after(combatComps, NULL, com);
+			obj->components[comp] = com;
+
+			break;
+		}
+
 		default:
 			assert(1 == 0);
 	}
@@ -309,6 +360,12 @@ void game_object_destroy(GameObject *obj) {
 
 	elementToRemove = list_search(movementComps, obj->components[COMP_MOVEMENT]);
 	if (elementToRemove != NULL ) { list_remove(movementComps, elementToRemove); }
+
+	elementToRemove = list_search(healthComps, obj->components[COMP_HEALTH]);
+	if (elementToRemove != NULL ) { list_remove(healthComps, elementToRemove); }
+
+	elementToRemove = list_search(combatComps, obj->components[COMP_COMBAT]);
+	if (elementToRemove != NULL ) { list_remove(combatComps, elementToRemove); }
 
 	// TODO: Clean up other components used by this object
 
@@ -338,7 +395,7 @@ void floor_add(u8 x, u8 y) {
 	game_object_update_component(floor, COMP_PHYSICAL, &floorPhys);
 }
 
-void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency) {
+void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 attack, i32 defense) {
 	GameObject *npc = game_object_create();
 	Position pos = {.objectId = npc->id, .x = x, .y = y, .layer = layer};
 	game_object_update_component(npc, COMP_POSITION, &pos);
@@ -349,6 +406,10 @@ void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 
 	Movement mv = {.objectId = npc->id, .speed = speed, .frequency = frequency, .ticksUntilNextMove = frequency, 
 		.chasingPlayer = false, .turnsSincePlayerSeen = 0};
 	game_object_update_component(npc, COMP_MOVEMENT, &mv);
+	Health hlth = {.objectId = npc->id, .currentHP = maxHP, .maxHP = maxHP, .recoveryRate = hpRecRate};
+	game_object_update_component(npc, COMP_HEALTH, &hlth);
+	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense};
+	game_object_update_component(npc, COMP_COMBAT, &com);
 }
 
 void wall_add(u8 x, u8 y) {
@@ -377,7 +438,14 @@ Point level_get_open_point(bool (*mapCells)[MAP_HEIGHT]) {
 
 // TODO: Move this somewhere appropriate
 i32 monster_for_level(i32 level) {
-	// TODO: Implement this
+	u32 r = rand() % 100;
+	u32 accum = 0;
+	for (int i = 0; i < MONSTER_TYPE_COUNT; i++) {
+		accum += monsterProbability[i][level-1];
+		if (accum >= r) {
+			return i + 1;
+		}
+	}
 	return 1;
 }
 
@@ -427,8 +495,8 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	level->level = levelToGenerate;
 	level->mapWalls = mapCells;
 
-	// TODO: Grab the actual number of monsters to generate for this level from level config
-	i32 monstersToAdd = 10;
+	// Grab the number of monsters to generate for this level from level config
+	i32 monstersToAdd = maxMonsters[levelToGenerate-1];
 	for (i32 i = 0; i < monstersToAdd; i++) {
 		// Consult our monster appearance data to determine what monster to generate.
 		i32 monsterId = monster_for_level(levelToGenerate);
@@ -445,8 +513,14 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			u32 s = atoi(speed);
 			char *freq = config_entity_value(monsterEntity, "mv_frequency");
 			u32 f = atoi(freq);
+			char *maxHP = config_entity_value(monsterEntity, "h_maxHP");
+			i32 hp = atoi(maxHP);
+			char *recRate = config_entity_value(monsterEntity, "h_recRate");
+			i32 rr = atoi(recRate);
+			i32 att = atoi(config_entity_value(monsterEntity, "com_attack"));
+			i32 def = atoi(config_entity_value(monsterEntity, "com_defense"));
 
-			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f);
+			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, att, def);
 		}
 	}
 	
