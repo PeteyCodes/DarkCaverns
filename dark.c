@@ -115,7 +115,8 @@ int main(int argc, char *argv[]) {
 
 	world_state_init();
 
-	GameObject *player = game_object_create();
+	// Create our player
+	player = game_object_create();
 	Visibility vis = {player->id, '@', 0x00FF00FF, 0x00000000};
 	game_object_update_component(player, COMP_VISIBILITY, &vis);
 	Physical phys = {player->id, true, true};
@@ -139,7 +140,6 @@ int main(int argc, char *argv[]) {
 	bool recalculateFOV = false;
 	bool playerMoved = false;
 	while (!done) {
-
 		playerMoved = false;
 
 		SDL_Event event;
@@ -182,7 +182,25 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);
 							recalculateFOV = true;					
 							playerMoved = true;		
-						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
+
+						} else {
+							// Check to see what is blocking movement. If NPC - resolve combat!
+							List *blockers = game_objects_at_position(playerPos->x, playerPos->y - 1);
+							GameObject *blockerObj = NULL;
+							ListElement *e = list_head(blockers);
+							while (e != NULL) {
+								GameObject *go = (GameObject *)list_data(e);
+								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
+								if (cc != NULL) {
+									blockerObj = go;
+									break;
+								}
+								e = list_next(e);
+							}
+							if (blockerObj != NULL) {
+								combat_attack(player, blockerObj);
+							}
+						}	
 					}
 					break;
 
@@ -192,7 +210,24 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
-						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
+						} else {
+							// Check to see what is blocking movement. If NPC - resolve combat!
+							List *blockers = game_objects_at_position(playerPos->x, playerPos->y + 1);
+							GameObject *blockerObj = NULL;
+							ListElement *e = list_head(blockers);
+							while (e != NULL) {
+								GameObject *go = (GameObject *)list_data(e);
+								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
+								if (cc != NULL) {
+									blockerObj = go;
+									break;
+								}
+								e = list_next(e);
+							}
+							if (blockerObj != NULL) {
+								combat_attack(player, blockerObj);
+							}
+						}	
 					}
 					break;
 
@@ -202,7 +237,24 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
-						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
+						} else {
+							// Check to see what is blocking movement. If NPC - resolve combat!
+							List *blockers = game_objects_at_position(playerPos->x - 1, playerPos->y);
+							GameObject *blockerObj = NULL;
+							ListElement *e = list_head(blockers);
+							while (e != NULL) {
+								GameObject *go = (GameObject *)list_data(e);
+								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
+								if (cc != NULL) {
+									blockerObj = go;
+									break;
+								}
+								e = list_next(e);
+							}
+							if (blockerObj != NULL) {
+								combat_attack(player, blockerObj);
+							}
+						}	
 					}
 					break;
 
@@ -212,7 +264,24 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
-						}	// TODO: Check to see what is blocking movement. If NPC - resolve combat!
+						} else {
+							// Check to see what is blocking movement. If NPC - resolve combat!
+							List *blockers = game_objects_at_position(playerPos->x + 1, playerPos->y);
+							GameObject *blockerObj = NULL;
+							ListElement *e = list_head(blockers);
+							while (e != NULL) {
+								GameObject *go = (GameObject *)list_data(e);
+								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
+								if (cc != NULL) {
+									blockerObj = go;
+									break;
+								}
+								e = list_next(e);
+							}
+							if (blockerObj != NULL) {
+								combat_attack(player, blockerObj);
+							}
+						}	
 					}
 					break;
 
@@ -227,6 +296,9 @@ int main(int argc, char *argv[]) {
 			Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 			generate_target_map(playerPos->x, playerPos->y);
 			movement_update();			
+
+			health_recover();
+			health_removal_update();
 		}
 
 		if (recalculateFOV) {

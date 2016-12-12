@@ -71,12 +71,16 @@ typedef struct {
 	i32 currentHP;
 	i32 maxHP;
 	i32 recoveryRate;		// HP recovered per tick.
+	i32 ticksUntilRemoval;	// Countdown to removal from world state
 } Health;
 
 typedef struct {
 	i32 objectId;
 	i32 attack;				// attack = damage inflicted per hit
+	i32 attackModifier;		// based on weapons/items
 	i32 defense;			// defense = damage absorbed before HP is affected
+	i32 defenseModifier;	// based on armor/items
+	i32 dodgeModifier;		// % that attack was dodged
 } Combat;
 
 
@@ -90,6 +94,7 @@ typedef struct {
 
 /* World State */
 #define MAX_GO 	10000
+global_variable GameObject *player = NULL;
 global_variable GameObject gameObjects[MAX_GO];
 global_variable List *positionComps;
 global_variable List *visibilityComps;
@@ -227,117 +232,181 @@ void game_object_update_component(GameObject *obj,
 
 	switch (comp) {
 		case COMP_POSITION: {
-			Position *pos = obj->components[COMP_POSITION];
-			if (pos == NULL) {
-				pos = (Position *)malloc(sizeof(Position));
+			if (compData != NULL) {
+				Position *pos = obj->components[COMP_POSITION];
+				if (pos == NULL) {
+					pos = (Position *)malloc(sizeof(Position));
+				} else {
+					// Remove game obj from the position helper DS
+					List *ls = goPositions[pos->x][pos->y];
+					list_remove_element_with_data(ls, obj);
+				}
+				Position *posData = (Position *)compData;
+				pos->objectId = obj->id;
+				pos->x = posData->x;
+				pos->y = posData->y;
+				pos->layer = posData->layer;
+
+				list_insert_after(positionComps, NULL, pos);
+				obj->components[comp] = pos;
+
+				// Update our helper DS 
+				List *gos = goPositions[posData->x][posData->y];
+				if (gos == NULL) {
+					gos = list_new(free);
+					goPositions[posData->x][posData->y] = gos;
+				}
+				list_insert_after(gos, NULL, obj);
+
 			} else {
+				// Clear component 
+				Position *pos = obj->components[COMP_POSITION];
+				if (pos != NULL) {
+					list_remove_element_with_data(positionComps, pos);				
+				}
+				obj->components[comp] = NULL;
+
 				// Remove game obj from the position helper DS
 				List *ls = goPositions[pos->x][pos->y];
 				list_remove_element_with_data(ls, obj);
 			}
-			Position *posData = (Position *)compData;
-			pos->objectId = obj->id;
-			pos->x = posData->x;
-			pos->y = posData->y;
-			pos->layer = posData->layer;
-
-			list_insert_after(positionComps, NULL, pos);
-			obj->components[comp] = pos;
-
-			// Update our helper DS 
-			List *gos = goPositions[posData->x][posData->y];
-			if (gos == NULL) {
-				gos = list_new(free);
-				goPositions[posData->x][posData->y] = gos;
-			}
-			list_insert_after(gos, NULL, obj);
 
 			break;
 		}
 
 		case COMP_VISIBILITY: {
-			Visibility *vis = obj->components[COMP_VISIBILITY];
-			if (vis == NULL)  {
-				vis = (Visibility *)malloc(sizeof(Visibility));
-			}
-			Visibility *visData = (Visibility *)compData;
-			vis->objectId = obj->id;
-			vis->glyph = visData->glyph;
-			vis->fgColor = visData->fgColor;
-			vis->bgColor = visData->bgColor;
-			vis->hasBeenSeen = visData->hasBeenSeen;
-			vis->visibleOutsideFOV = visData->visibleOutsideFOV;
+			if (compData != NULL) {
+				Visibility *vis = obj->components[COMP_VISIBILITY];
+				if (vis == NULL)  {
+					vis = (Visibility *)malloc(sizeof(Visibility));
+				}
+				Visibility *visData = (Visibility *)compData;
+				vis->objectId = obj->id;
+				vis->glyph = visData->glyph;
+				vis->fgColor = visData->fgColor;
+				vis->bgColor = visData->bgColor;
+				vis->hasBeenSeen = visData->hasBeenSeen;
+				vis->visibleOutsideFOV = visData->visibleOutsideFOV;
 
-			list_insert_after(visibilityComps, NULL, vis);
-			obj->components[comp] = vis;
+				list_insert_after(visibilityComps, NULL, vis);
+				obj->components[comp] = vis;
+
+			} else {
+				// Clear component 
+				Visibility *vis = obj->components[COMP_VISIBILITY];
+				if (vis != NULL) {
+					list_remove_element_with_data(visibilityComps, vis);				
+				}
+				obj->components[comp] = NULL;
+			}
 
 			break;
 		}
 
 		case COMP_PHYSICAL: {
-			Physical *phys = obj->components[COMP_PHYSICAL];
-			if (phys == NULL) {
-				phys = (Physical *)malloc(sizeof(Physical));
-			}
-			Physical *physData = (Physical *)compData;
-			phys->objectId = obj->id;
-			phys->blocksSight = physData->blocksSight;
-			phys->blocksMovement = physData->blocksMovement;
+			if (compData != NULL) {
+				Physical *phys = obj->components[COMP_PHYSICAL];
+				if (phys == NULL) {
+					phys = (Physical *)malloc(sizeof(Physical));
+				}
+				Physical *physData = (Physical *)compData;
+				phys->objectId = obj->id;
+				phys->blocksSight = physData->blocksSight;
+				phys->blocksMovement = physData->blocksMovement;
 
-			list_insert_after(physicalComps, NULL, phys);
-			obj->components[comp] = phys;
+				list_insert_after(physicalComps, NULL, phys);
+				obj->components[comp] = phys;
+
+			} else {
+				// Clear component 
+				Physical *phys = obj->components[COMP_PHYSICAL];
+				if (phys != NULL) {
+					list_remove_element_with_data(physicalComps, phys);				
+				}
+				obj->components[comp] = NULL;
+			}
 
 			break;
 		}
 
 		case COMP_MOVEMENT: {
-			Movement *mv = obj->components[COMP_MOVEMENT];
-			if (mv == NULL) {
-				mv = (Movement *)malloc(sizeof(Movement));
-			}
-			Movement *mvData = (Movement *)compData;
-			mv->objectId = obj->id;
-			mv->speed = mvData->speed;
-			mv->frequency = mvData->frequency;
-			mv->ticksUntilNextMove = mvData->ticksUntilNextMove;
-			mv->chasingPlayer = mvData->chasingPlayer;
-			mv->turnsSincePlayerSeen = mvData->turnsSincePlayerSeen;
+			if (compData != NULL) {
+				Movement *mv = obj->components[COMP_MOVEMENT];
+				if (mv == NULL) {
+					mv = (Movement *)malloc(sizeof(Movement));
+				}
+				Movement *mvData = (Movement *)compData;
+				mv->objectId = obj->id;
+				mv->speed = mvData->speed;
+				mv->frequency = mvData->frequency;
+				mv->ticksUntilNextMove = mvData->ticksUntilNextMove;
+				mv->chasingPlayer = mvData->chasingPlayer;
+				mv->turnsSincePlayerSeen = mvData->turnsSincePlayerSeen;
 
-			list_insert_after(movementComps, NULL, mv);
-			obj->components[comp] = mv;
+				list_insert_after(movementComps, NULL, mv);
+				obj->components[comp] = mv;
+
+			} else {
+				// Clear component 
+				Movement *mv = obj->components[COMP_MOVEMENT];
+				if (mv != NULL) {
+					list_remove_element_with_data(movementComps, mv);				
+				}
+				obj->components[comp] = NULL;				
+			}
 
 			break;
 		}
 
 		case COMP_HEALTH: {
-			Health *hlth = obj->components[COMP_HEALTH];
-			if (hlth == NULL) {
-				hlth = (Health *)malloc(sizeof(Health));
-			}
-			Health *hlthData = (Health *)compData;
-			hlth->objectId = obj->id;
-			hlth->currentHP = hlthData->currentHP;
-			hlth->maxHP = hlthData->maxHP;
-			hlth->recoveryRate = hlthData->recoveryRate;
+			if (compData != NULL) {
+				Health *hlth = obj->components[COMP_HEALTH];
+				if (hlth == NULL) {
+					hlth = (Health *)malloc(sizeof(Health));
+				}
+				Health *hlthData = (Health *)compData;
+				hlth->objectId = obj->id;
+				hlth->currentHP = hlthData->currentHP;
+				hlth->maxHP = hlthData->maxHP;
+				hlth->recoveryRate = hlthData->recoveryRate;
 
-			list_insert_after(healthComps, NULL, hlth);
-			obj->components[comp] = hlth;
+				list_insert_after(healthComps, NULL, hlth);
+				obj->components[comp] = hlth;
+
+			} else {
+				// Clear component 
+				Health *h = obj->components[COMP_HEALTH];
+				if (h != NULL) {
+					list_remove_element_with_data(healthComps, h);				
+				}
+				obj->components[comp] = NULL;				
+			}
 
 			break;
 		}
 
 		case COMP_COMBAT: {
-			Combat *com = obj->components[COMP_COMBAT];
-			if (com == NULL) {
-				com = (Combat *)malloc(sizeof(Combat));
-			}
-			Combat *combatData = (Combat *)compData;
-			com->objectId = obj->id;
-			com->attack = combatData->attack;
-			com->defense = combatData->defense;
+			if (compData != NULL) {
+				Combat *com = obj->components[COMP_COMBAT];
+				if (com == NULL) {
+					com = (Combat *)malloc(sizeof(Combat));
+				}
+				Combat *combatData = (Combat *)compData;
+				com->objectId = obj->id;
+				com->attack = combatData->attack;
+				com->defense = combatData->defense;
 
-			list_insert_after(combatComps, NULL, com);
-			obj->components[comp] = com;
+				list_insert_after(combatComps, NULL, com);
+				obj->components[comp] = com;
+				
+			} else {
+				// Clear component 
+				Combat *c = obj->components[COMP_COMBAT];
+				if (c != NULL) {
+					list_remove_element_with_data(combatComps, c);				
+				}
+				obj->components[comp] = NULL;				
+			}
 
 			break;
 		}
@@ -370,6 +439,9 @@ void game_object_destroy(GameObject *obj) {
 	// TODO: Clean up other components used by this object
 
 	obj->id = UNUSED;
+	for (i32 i = 0; i < COMPONENT_COUNT; i++) {
+		obj->components[i] = NULL;
+	}
 }
 
 
@@ -722,5 +794,104 @@ void movement_update() {
 		e = list_next(e);
 	}
 
+
+}
+
+
+/* Health Routines */
+
+void health_check_death(GameObject *go) {
+	Health *h = (Health *)game_object_get_component(go, COMP_HEALTH);
+	if (h->currentHP <= 0) {
+		// Death!
+		if (go == player) {
+			// TODO: Enter endgame flow
+
+		} else {
+			Visibility *vis = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
+			vis->glyph = '%';
+			vis->fgColor = 0x990000FF;
+
+			Physical *phys = (Physical *)game_object_get_component(go, COMP_PHYSICAL);
+			phys->blocksMovement = false;
+			phys->blocksSight = false;
+
+			// Remove the movement component - no more moving!
+			game_object_update_component(go, COMP_MOVEMENT, NULL);
+
+			h->ticksUntilRemoval = 5;
+		}
+	}
+}
+
+void health_recover() {
+	// Loop through all our health components and apply recovery HP (only if object is not already dead)
+	ListElement *e = list_head(healthComps);
+	while (e != NULL) {
+		Health *h = (Health *)list_data(e);
+		if (h->currentHP > 0) {
+			h->currentHP += h->recoveryRate;
+			if (h->currentHP > h->maxHP) { 
+				h->currentHP = h->maxHP;
+			}			
+		}
+		e = list_next(e);
+	}
+}
+
+void health_removal_update() {
+	// Loop through all our health components and remove any objects that have been dead for awhile. 
+	// Decrement counters for newly-dead objects
+	ListElement *e = list_head(healthComps);
+	while (e != NULL) {
+		Health *h = (Health *)list_data(e);
+		if (h->currentHP <= 0) {
+			if (h->ticksUntilRemoval <= 0) {
+				// Remove object and all related components from world state
+				GameObject goToDestroy = gameObjects[h->objectId];
+				game_object_destroy(&goToDestroy);
+
+			} else {
+				h->ticksUntilRemoval -= 1;
+			}
+		}
+		e = list_next(e);
+	}
+}
+
+
+/* Combat Routines */
+
+void combat_deal_damage(GameObject *attacker, GameObject *defender) {
+	Combat *att = (Combat *)game_object_get_component(attacker, COMP_COMBAT);
+	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
+	Health *defHealth = (Health *)game_object_get_component(defender, COMP_HEALTH);
+
+	i32 totAtt = att->attack + att->attackModifier;
+	i32 totDef = def->defense + def->defenseModifier;
+
+	if (totDef >= totAtt) {
+		// TODO: Show a message about no damage dealt
+
+	} else {
+		defHealth->currentHP -= (totAtt - totDef);
+		health_check_death(defender);
+	}
+}
+
+void combat_attack(GameObject *attacker, GameObject *defender) {
+	Combat *att = (Combat *)game_object_get_component(attacker, COMP_COMBAT);
+	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
+
+	u32 hitRoll = rand() % 100;
+	i32 hitWindow = 99 - def->dodgeModifier;
+	if (hitRoll < hitWindow) {
+		// We have a hit
+		combat_deal_damage(attacker, defender);
+
+	} else {
+		// Miss
+		// TODO: Show a message stating that the attack was a miss.
+	}
 
 }
