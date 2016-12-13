@@ -80,7 +80,7 @@ typedef struct {
 	i32 attackModifier;		// based on weapons/items
 	i32 defense;			// defense = damage absorbed before HP is affected
 	i32 defenseModifier;	// based on armor/items
-	i32 dodgeModifier;		// % that attack was dodged
+	i32 hitModifier;		// % that attack was missed/dodged/etc
 } Combat;
 
 
@@ -398,7 +398,7 @@ void game_object_update_component(GameObject *obj,
 				com->defense = combatData->defense;
 				com->attackModifier = combatData->attackModifier;
 				com->defenseModifier = combatData->defenseModifier;
-				com->dodgeModifier = combatData->dodgeModifier;
+				com->hitModifier = combatData->hitModifier;
 
 				list_insert_after(combatComps, NULL, com);
 				obj->components[comp] = com;
@@ -484,7 +484,7 @@ void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 
 	game_object_update_component(npc, COMP_MOVEMENT, &mv);
 	Health hlth = {.objectId = npc->id, .currentHP = maxHP, .maxHP = maxHP, .recoveryRate = hpRecRate};
 	game_object_update_component(npc, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .attackModifier = attMod, .defenseModifier = defMod, .dodgeModifier = dodgeMod};
+	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .attackModifier = attMod, .defenseModifier = defMod, .hitModifier = dodgeMod};
 	game_object_update_component(npc, COMP_COMBAT, &com);
 }
 
@@ -856,13 +856,17 @@ void health_removal_update() {
 			if (h->ticksUntilRemoval <= 0) {
 				// Remove object and all related components from world state
 				GameObject goToDestroy = gameObjects[h->objectId];
+				e = list_next(e);	// Grab the next element in the list, because we're about to destroy this one
 				game_object_destroy(&goToDestroy);
 
 			} else {
 				h->ticksUntilRemoval -= 1;
+	 			e = list_next(e);
 			}
+
+		} else {
+			e = list_next(e);
 		}
-		e = list_next(e);
 	}
 }
 
@@ -891,7 +895,7 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 
 	u32 hitRoll = rand() % 100;
-	i32 hitWindow = 99 - def->dodgeModifier;
+	i32 hitWindow = 99 - def->hitModifier;
 	if (hitRoll < hitWindow) {
 		// We have a hit
 		combat_deal_damage(attacker, defender);
