@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
 	game_object_update_component(player, COMP_PHYSICAL, &phys);
 	Health hlth = {.objectId = player->id, .currentHP = 20, .maxHP = 20, .recoveryRate = 1};
 	game_object_update_component(player, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = player->id, .attack = 2, .defense = 2};
+	Combat com = {.objectId = player->id, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .dodgeModifier = 0};
 	game_object_update_component(player, COMP_COMBAT, &com);
 
 	// Create a level and place our player in it

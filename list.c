@@ -75,6 +75,8 @@ bool list_insert_after(List *list, ListElement *element, void *data) {
 		// Insert at head of list
 		if (list_size(list) == 0) {
 			list->tail = newElement;
+		} else {
+			list->head->prev = newElement;		
 		}
 
 		newElement->next = list->head;

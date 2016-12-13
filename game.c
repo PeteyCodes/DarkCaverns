@@ -369,6 +369,7 @@ void game_object_update_component(GameObject *obj,
 				hlth->currentHP = hlthData->currentHP;
 				hlth->maxHP = hlthData->maxHP;
 				hlth->recoveryRate = hlthData->recoveryRate;
+				hlth->ticksUntilRemoval = hlthData->ticksUntilRemoval;
 
 				list_insert_after(healthComps, NULL, hlth);
 				obj->components[comp] = hlth;
@@ -395,6 +396,9 @@ void game_object_update_component(GameObject *obj,
 				com->objectId = obj->id;
 				com->attack = combatData->attack;
 				com->defense = combatData->defense;
+				com->attackModifier = combatData->attackModifier;
+				com->defenseModifier = combatData->defenseModifier;
+				com->dodgeModifier = combatData->dodgeModifier;
 
 				list_insert_after(combatComps, NULL, com);
 				obj->components[comp] = com;
@@ -467,7 +471,7 @@ void floor_add(u8 x, u8 y) {
 	game_object_update_component(floor, COMP_PHYSICAL, &floorPhys);
 }
 
-void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 attack, i32 defense) {
+void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
 	GameObject *npc = game_object_create();
 	Position pos = {.objectId = npc->id, .x = x, .y = y, .layer = layer};
 	game_object_update_component(npc, COMP_POSITION, &pos);
@@ -480,7 +484,7 @@ void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 
 	game_object_update_component(npc, COMP_MOVEMENT, &mv);
 	Health hlth = {.objectId = npc->id, .currentHP = maxHP, .maxHP = maxHP, .recoveryRate = hpRecRate};
 	game_object_update_component(npc, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense};
+	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .attackModifier = attMod, .defenseModifier = defMod, .dodgeModifier = dodgeMod};
 	game_object_update_component(npc, COMP_COMBAT, &com);
 }
 
@@ -592,7 +596,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			i32 att = atoi(config_entity_value(monsterEntity, "com_attack"));
 			i32 def = atoi(config_entity_value(monsterEntity, "com_defense"));
 
-			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, att, def);
+			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, att, def, 0, 0, 0);
 		}
 	}
 	
@@ -811,6 +815,9 @@ void health_check_death(GameObject *go) {
 			Visibility *vis = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
 			vis->glyph = '%';
 			vis->fgColor = 0x990000FF;
+
+			Position *pos = (Position *)game_object_get_component(go, COMP_POSITION);
+			pos->layer = LAYER_GROUND;
 
 			Physical *phys = (Physical *)game_object_get_component(go, COMP_PHYSICAL);
 			phys->blocksMovement = false;
