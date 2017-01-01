@@ -117,13 +117,13 @@ int main(int argc, char *argv[]) {
 
 	// Create our player
 	player = game_object_create();
-	Visibility vis = {player->id, '@', 0x00FF00FF, 0x00000000};
+	Visibility vis = {.objectId=player->id, .glyph='@', .fgColor=0x00FF00FF, .bgColor=0x00000000, .hasBeenSeen=true};
 	game_object_update_component(player, COMP_VISIBILITY, &vis);
 	Physical phys = {player->id, true, true};
 	game_object_update_component(player, COMP_PHYSICAL, &phys);
 	Health hlth = {.objectId = player->id, .currentHP = 20, .maxHP = 20, .recoveryRate = 1};
 	game_object_update_component(player, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = player->id, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .hitModifier = 0};
+	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .hitModifier = 0};
 	game_object_update_component(player, COMP_COMBAT, &com);
 
 	// Create a level and place our player in it

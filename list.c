@@ -98,7 +98,6 @@ bool list_insert_after(List *list, ListElement *element, void *data) {
 }
 
 ListElement * list_item_at(List *list, u32 index) {
-	void * data = NULL;
 	u32 currIdx = 0;
 	ListElement *currElement = list->head;
 
@@ -167,8 +166,7 @@ void * list_remove(List *list, ListElement *element) {
 
 
 /*
-Removes the given element. If element is NULL, removes the head of the list. 
-Returns a pointer to the data stored in the element, or NULL on failure.
+Removes the element containing the given data, if such an element is found. 
 */
 void list_remove_element_with_data(List *list, void *data) {
 	if ((list_size(list) == 0) || (data == NULL)) {
@@ -185,28 +183,7 @@ void list_remove_element_with_data(List *list, void *data) {
 	}
 
 	if (elementToRemove != NULL) {
-		ListElement *prevElement = elementToRemove->prev;
-		ListElement *nextElement = elementToRemove->next;
-
-		if (prevElement != NULL && nextElement != NULL) {
-			prevElement->next = nextElement;
-			nextElement->prev = prevElement;
-
-		} else {
-			if (prevElement == NULL) {
-				// We're at start of list
-				if (nextElement != NULL) { nextElement->prev = NULL; }
-				list->head = nextElement;
-			} 
-			if (nextElement == NULL) {
-				// We're at end of list
-				if (prevElement != NULL) { prevElement->next = NULL; }
-				list->tail = prevElement;
-			}
-		}
-
-		free(elementToRemove);
-		list->size -= 1;
+		list_remove(list, elementToRemove);
 	}
 
 	return;

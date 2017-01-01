@@ -54,7 +54,7 @@ void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 				FovCell mapCell = map_cell_for_local_cell(sector, heroCell, cellToTranslate);
 
 				// Is cell within map?
-				if ((mapCell.x >= 0) && (mapCell.y >= 0) && (mapCell.x < MAP_WIDTH) && (mapCell.y < MAP_HEIGHT)) {
+				if ((mapCell.x < MAP_WIDTH) && (mapCell.y < MAP_HEIGHT)) {
 					// Is cell within view distance?
 					if (fov_distance_between(0, 0, cellX, cellY) <= FOV_DISTANCE) {
 						// Is cell within known shadow?

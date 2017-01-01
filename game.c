@@ -76,6 +76,8 @@ typedef struct {
 
 typedef struct {
 	i32 objectId;
+	i32 toHit;				// chance to hit
+	i32 toHitModifier;
 	i32 attack;				// attack = damage inflicted per hit
 	i32 attackModifier;		// based on weapons/items
 	i32 defense;			// defense = damage absorbed before HP is affected
@@ -394,6 +396,8 @@ void game_object_update_component(GameObject *obj,
 				}
 				Combat *combatData = (Combat *)compData;
 				com->objectId = obj->id;
+				com->toHit = combatData->toHit;
+				com->toHitModifier = combatData->toHitModifier;
 				com->attack = combatData->attack;
 				com->defense = combatData->defense;
 				com->attackModifier = combatData->attackModifier;
@@ -471,7 +475,7 @@ void floor_add(u8 x, u8 y) {
 	game_object_update_component(floor, COMP_PHYSICAL, &floorPhys);
 }
 
-void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
+void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 toHit, i32 hitMod, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
 	GameObject *npc = game_object_create();
 	Position pos = {.objectId = npc->id, .x = x, .y = y, .layer = layer};
 	game_object_update_component(npc, COMP_POSITION, &pos);
@@ -484,7 +488,7 @@ void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 
 	game_object_update_component(npc, COMP_MOVEMENT, &mv);
 	Health hlth = {.objectId = npc->id, .currentHP = maxHP, .maxHP = maxHP, .recoveryRate = hpRecRate};
 	game_object_update_component(npc, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .attackModifier = attMod, .defenseModifier = defMod, .hitModifier = dodgeMod};
+	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .toHit = toHit, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod, .hitModifier = dodgeMod};
 	game_object_update_component(npc, COMP_COMBAT, &com);
 }
 
@@ -593,10 +597,11 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			i32 hp = atoi(maxHP);
 			char *recRate = config_entity_value(monsterEntity, "h_recRate");
 			i32 rr = atoi(recRate);
+			i32 hit = atoi(config_entity_value(monsterEntity, "com_toHit"));
 			i32 att = atoi(config_entity_value(monsterEntity, "com_attack"));
 			i32 def = atoi(config_entity_value(monsterEntity, "com_defense"));
 
-			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, att, def, 0, 0, 0);
+			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, hit, 0, att, def, 0, 0, 0);
 		}
 	}
 	
@@ -612,6 +617,14 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 
 // TODO: Need a level cleanup function 
 
+
+/* Message */
+void add_message(char *msg, u32 color) {
+	// TODO: When we build our UI system, have the messages display there. Also
+	// store them in a buffer so we can show the last few messages at once.
+	// For now, messages are just sent to stdout
+	printf("%s\n", msg);
+}
 
 /* Movement System */
 
@@ -878,13 +891,24 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 	Health *defHealth = (Health *)game_object_get_component(defender, COMP_HEALTH);
 
-	i32 totAtt = att->attack + att->attackModifier;
-	i32 totDef = def->defense + def->defenseModifier;
+	i32 totAtt = (rand() % att->attack) + att->attackModifier;
+	i32 totDef = (rand() % def->defense) + def->defenseModifier;
 
 	if (totDef >= totAtt) {
-		// TODO: Show a message about no damage dealt
+		if (attacker == player) {
+			add_message("Your attack didn't do any damage.", 0xCCCCCCFF);
+		} else {
+
+		}
 
 	} else {
+		if (attacker == player) {
+			add_message("You hit", 0xCCCCCCFF);
+
+		} else {
+			
+		}
+
 		defHealth->currentHP -= (totAtt - totDef);
 		health_check_death(defender);
 	}
@@ -894,15 +918,15 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	Combat *att = (Combat *)game_object_get_component(attacker, COMP_COMBAT);
 	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 
-	u32 hitRoll = rand() % 100;
-	i32 hitWindow = 99 - def->hitModifier;
+	i32 hitRoll = rand() % 100;
+	i32 hitWindow = (att->toHit + att->toHitModifier) - def->hitModifier;
 	if (hitRoll < hitWindow) {
 		// We have a hit
 		combat_deal_damage(attacker, defender);
 
 	} else {
 		// Miss
-		// TODO: Show a message stating that the attack was a miss.
+		add_message("The attack missed.", 0xFFFFFFFF);
 	}
 
 }
