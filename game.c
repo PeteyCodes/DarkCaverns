@@ -903,7 +903,9 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 
 	} else {
 		if (attacker == player) {
-			add_message("You hit", 0xCCCCCCFF);
+			char *msg = NULL;
+			sasprintf(msg, "You hit for %d damage.", (totAtt - totDef));
+			add_message(msg, 0xCCCCCCFF);
 
 		} else {
 			
