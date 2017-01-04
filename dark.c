@@ -199,6 +199,7 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
+								playerMoved = true;		
 							}
 						}	
 					}
@@ -226,6 +227,7 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
+								playerMoved = true;		
 							}
 						}	
 					}
@@ -253,6 +255,7 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
+								playerMoved = true;		
 							}
 						}	
 					}
@@ -264,6 +267,7 @@ int main(int argc, char *argv[]) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
 							playerMoved = true;		
+
 						} else {
 							// Check to see what is blocking movement. If NPC - resolve combat!
 							List *blockers = game_objects_at_position(playerPos->x + 1, playerPos->y);
@@ -280,6 +284,7 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
+								playerMoved = true;		
 							}
 						}	
 					}

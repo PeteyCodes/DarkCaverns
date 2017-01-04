@@ -115,6 +115,11 @@ global_variable Config *levelConfig = NULL;
 global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
 
 
+/* Necessary function declarations */
+
+void combat_attack(GameObject *attacker, GameObject *defender);
+
+
 /* World State Management */
 void world_state_init() {
 	for (u32 i = 0; i < MAX_GO; i++) {
@@ -747,65 +752,73 @@ void movement_update() {
 				}
 			}
 
-			// Determine new position based on our target map
-			if (giveChase) {
-				// Evaluate all cardinal direction cells and pick randomly between optimal moves 
-				Position moves[4];
-				i32 moveCount = 0;
-				i32 currTargetValue = targetMap[p->x][p->y];
-				if (targetMap[p->x - 1][p->y] < currTargetValue) {
-					Position np = newPos;
-					np.x -= 1;	
-					moves[moveCount] = np;					
-					moveCount += 1;
-				}
-				if (targetMap[p->x][p->y - 1] < currTargetValue) { 
-					Position np = newPos;
-					np.y -= 1;						
-					moves[moveCount] = np;					
-					moveCount += 1;
-				}
-				if (targetMap[p->x + 1][p->y] < currTargetValue) { 
-					Position np = newPos;
-					np.x += 1;						
-					moves[moveCount] = np;					
-					moveCount += 1;
-				}
-				if (targetMap[p->x][p->y + 1] < currTargetValue) { 
-					Position np = newPos;
-					np.y += 1;						
-					moves[moveCount] = np;					
-					moveCount += 1;
-				}
-
-				u32 moveIdx = rand() % moveCount;
-				newPos = moves[moveIdx];
+			// Determine if we're currently in combat range of the player
+			if ((fovMap[p->x][p->y] > 0) && (targetMap[p->x][p->y] == 1)) {
+				// Combat range - so attack the player
+				combat_attack(&gameObjects[mv->objectId], player);
 
 			} else {
-				// Move randomly?
-				u32 dir = rand() % 4;
-				switch (dir) {
-					case 0:
-						newPos.x -= 1;
-						break;
-					case 1:
-						newPos.y -= 1;
-						break;
-					case 2:
-						newPos.x += 1;
-						break;
-					default: 
-						newPos.y += 1;
+				// Out of combat range, so determine new position based on our target map
+				if (giveChase) {
+					// Evaluate all cardinal direction cells and pick randomly between optimal moves 
+					Position moves[4];
+					i32 moveCount = 0;
+					i32 currTargetValue = targetMap[p->x][p->y];
+					if (targetMap[p->x - 1][p->y] < currTargetValue) {
+						Position np = newPos;
+						np.x -= 1;	
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+					if (targetMap[p->x][p->y - 1] < currTargetValue) { 
+						Position np = newPos;
+						np.y -= 1;						
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+					if (targetMap[p->x + 1][p->y] < currTargetValue) { 
+						Position np = newPos;
+						np.x += 1;						
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+					if (targetMap[p->x][p->y + 1] < currTargetValue) { 
+						Position np = newPos;
+						np.y += 1;						
+						moves[moveCount] = np;					
+						moveCount += 1;
+					}
+
+					u32 moveIdx = rand() % moveCount;
+					newPos = moves[moveIdx];
+
+				} else {
+					// Move randomly?
+					u32 dir = rand() % 4;
+					switch (dir) {
+						case 0:
+							newPos.x -= 1;
+							break;
+						case 1:
+							newPos.y -= 1;
+							break;
+						case 2:
+							newPos.x += 1;
+							break;
+						default: 
+							newPos.y += 1;
+					}
+				}
+
+				// Test to see if the new position can be moved to
+				if (can_move(newPos)) {
+					game_object_update_component(&gameObjects[mv->objectId], COMP_POSITION, &newPos);
+					mv->ticksUntilNextMove = mv->frequency;				
+				} else {
+					mv->ticksUntilNextMove += 1;
 				}
 			}
 
-			// Test to see if the new position can be moved to
-			if (can_move(newPos)) {
-				game_object_update_component(&gameObjects[mv->objectId], COMP_POSITION, &newPos);
-				mv->ticksUntilNextMove = mv->frequency;				
-			} else {
-				mv->ticksUntilNextMove += 1;
-			}
 		}
 
 		e = list_next(e);
@@ -822,9 +835,17 @@ void health_check_death(GameObject *go) {
 	if (h->currentHP <= 0) {
 		// Death!
 		if (go == player) {
+			char *msg = NULL;
+			sasprintf(msg, "You have died.");
+			add_message(msg, 0xCC0000FF);
+
 			// TODO: Enter endgame flow
 
 		} else {
+			char *msg = NULL;
+			sasprintf(msg, "You killed the [MONSTER].");
+			add_message(msg, 0xCC0000FF);
+
 			Visibility *vis = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
 			vis->glyph = '%';
 			vis->fgColor = 0x990000FF;
@@ -898,7 +919,7 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 		if (attacker == player) {
 			add_message("Your attack didn't do any damage.", 0xCCCCCCFF);
 		} else {
-
+			add_message("The creature's pathetic attack didn't do any damage.", 0xCCCCCCFF);
 		}
 
 	} else {
@@ -908,7 +929,9 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 			add_message(msg, 0xCCCCCCFF);
 
 		} else {
-			
+			char *msg = NULL;
+			sasprintf(msg, "It hits for %d damage.", (totAtt - totDef));
+			add_message(msg, 0xCCCCCCFF);
 		}
 
 		defHealth->currentHP -= (totAtt - totDef);
@@ -924,11 +947,13 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	i32 hitWindow = (att->toHit + att->toHitModifier) - def->hitModifier;
 	if (hitRoll < hitWindow) {
 		// We have a hit
+		char *msg = NULL;
+		sasprintf(msg, "The attack hits.");
+		add_message(msg, 0xCCCCCCFF);
 		combat_deal_damage(attacker, defender);
 
 	} else {
 		// Miss
 		add_message("The attack missed.", 0xFFFFFFFF);
 	}
-
 }
