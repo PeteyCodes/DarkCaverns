@@ -147,6 +147,36 @@ PT_ConsolePutCharAt(PT_Console *con, asciiChar c,
                  &fgColor);
 }
 
+internal void
+PT_ConsolePutStringInRect(PT_Console *con, char *string,
+                          PT_Rect rect, bool wrap, 
+                          u32 fgColor, u32 bgColor) {
+    u32 len = strlen(string);
+    i32 x = rect.x;
+    i32 x2 = x + rect.w;
+    i32 y = rect.y;
+    i32 y2 = y + rect.h;
+    for (u32 i = 0; i < len; i++) {
+        bool shouldPut = true;
+        if (x >= x2) {
+            if (wrap) {
+                x = rect.x;
+                y += 1;
+            } else {
+                shouldPut = false;
+            }
+        }
+        if (y >= y2) {
+            shouldPut = false;
+        }
+        if (shouldPut) {
+            PT_ConsolePutCharAt(con, (asciiChar)string[i], 
+                                  x, y, fgColor, bgColor);
+            x += 1;
+        }
+    }
+}
+
 internal void 
 PT_ConsoleSetBitmapFont(PT_Console *con, char *filename, 
                         asciiChar firstCharInAtlas,

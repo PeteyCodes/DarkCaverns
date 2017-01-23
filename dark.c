@@ -39,16 +39,33 @@ typedef int64_t		i64;
 // #define HASHMAP_IMPLEMENTATION
 // #include "hashmap.h"
 #include "pt_console.c"
+#include "pt_ui.c"
 #include "map.c"
 #include "game.c"
 #include "fov.c"
 
 
 void render_screen(SDL_Renderer *renderer, 
-				  SDL_Texture *screen, 
-				  PT_Console *console) {
+				  SDL_Texture *screenTexture, 
+				  UIScreen *screen) {
 
-	PT_ConsoleClear(console);
+	PT_ConsoleClear(screen->console);
+
+	// Render views from back to front for the current screen
+	ListElement *e = list_head(screen->views);
+	while (e != NULL) {
+		UIView *v = (UIView *)list_data(e);
+		v->render(screen->console);
+		e = list_next(e);
+	}
+
+	SDL_UpdateTexture(screenTexture, NULL, screen->console->pixels, SCREEN_WIDTH * sizeof(u32));
+	SDL_RenderClear(renderer);
+	SDL_RenderCopy(renderer, screenTexture, NULL, NULL);
+	SDL_RenderPresent(renderer);
+}
+
+internal gameMapRender(PT_Console *console) {
 
 	// Setup layer render history  
 	u8 layerRendered[MAP_WIDTH][MAP_HEIGHT];
@@ -82,10 +99,32 @@ void render_screen(SDL_Renderer *renderer,
 		e = list_next(e);
 	}
 
-	SDL_UpdateTexture(screen, NULL, console->pixels, SCREEN_WIDTH * sizeof(u32));
-	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, screen, NULL, NULL);
-	SDL_RenderPresent(renderer);
+}
+
+internal void messageLogRender(PT_Console *console) {
+	if (messageLog == NULL) { return; }
+
+	// Get the last 5 messages from the log
+	ListElement *e = list_tail(messageLog);
+	i32 msgCount = list_size(messageLog);
+	u32 row = 44;
+	u32 col = 30;
+
+	if (msgCount < 5) {
+		row -= (5 - msgCount);
+	} else {
+		msgCount = 5;
+	}
+
+	for (i32 i = 0; i < msgCount; i++) {
+		if (e != NULL) {
+			Message *m = (Message *)list_data(e);
+			PT_Rect rect = {.x = col, .y = row, .w = 50, .h = 1};
+			PT_ConsolePutStringInRect(console, m->msg, rect, false, m->fgColor, 0x00000000);
+			e = list_prev(e);			
+			row -= 1;
+		}
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -105,12 +144,29 @@ int main(int argc, char *argv[]) {
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
 	SDL_RenderSetLogicalSize(renderer, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	SDL_Texture *screen = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
+	SDL_Texture *screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	PT_Console *console = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, 
-										 NUM_ROWS, NUM_COLS);
+	// PT_Console *console = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, 
+	// 									 NUM_ROWS, NUM_COLS);
 
-	PT_ConsoleSetBitmapFont(console, "./terminal16x16.png", 0, 16, 16);
+	// PT_ConsoleSetBitmapFont(console, "./terminal16x16.png", 0, 16, 16);
+
+	// TODO: Initialize UI state (screens, view stack, etc)
+	UIScreen *activeScreen = NULL;
+
+	PT_Console *igConsole = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, NUM_ROWS, NUM_COLS);
+	PT_ConsoleSetBitmapFont(igConsole, "./terminal16x16.png", 0, 16, 16);
+	List *igViews = list_new(NULL);
+
+	UIView mapView = {.render = gameMapRender};
+	list_insert_after(igViews, NULL, &mapView);
+
+	UIView logView = {.render = messageLogRender};
+	list_insert_after(igViews, NULL, &logView);
+
+	UIScreen inGameScreen = {.console = igConsole, .views = igViews};
+
+	activeScreen = &inGameScreen;
 
 
 	world_state_init();
@@ -312,7 +368,8 @@ int main(int argc, char *argv[]) {
 			recalculateFOV = false;
 		}
 
-		render_screen(renderer, screen, console);
+		// TODO: Determine active screen and render it
+		render_screen(renderer, screenTexture, activeScreen);
 
 		// Limit our FPS
 		i32 sleepTime = timePerFrame - (SDL_GetTicks() - frameStart);

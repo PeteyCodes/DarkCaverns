@@ -47,6 +47,7 @@ typedef struct {
 	u32 bgColor;
 	bool hasBeenSeen;
 	bool visibleOutsideFOV;
+	char *name;
 } Visibility;
 
 typedef struct {
@@ -94,6 +95,13 @@ typedef struct {
 } DungeonLevel;
 
 
+/* Message Log */
+typedef struct {
+	char *msg;
+	u32 fgColor;
+} Message;
+
+
 /* World State */
 #define MAX_GO 	10000
 global_variable GameObject *player = NULL;
@@ -113,6 +121,7 @@ global_variable Config *monsterConfig = NULL;
 global_variable i32 monsterProbability[MONSTER_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
 global_variable Config *levelConfig = NULL;
 global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
+global_variable List *messageLog = NULL;
 
 
 /* Necessary function declarations */
@@ -294,6 +303,10 @@ void game_object_update_component(GameObject *obj,
 				vis->bgColor = visData->bgColor;
 				vis->hasBeenSeen = visData->hasBeenSeen;
 				vis->visibleOutsideFOV = visData->visibleOutsideFOV;
+				if (visData->name != NULL) {
+					vis->name = malloc(strlen(visData->name));
+					strcpy(vis->name, visData->name);
+				}
 
 				list_insert_after(visibilityComps, NULL, vis);
 				obj->components[comp] = vis;
@@ -474,17 +487,17 @@ void floor_add(u8 x, u8 y) {
 	GameObject *floor = game_object_create();
 	Position floorPos = {.objectId = floor->id, .x = x, .y = y, .layer = LAYER_GROUND};
 	game_object_update_component(floor, COMP_POSITION, &floorPos);
-	Visibility floorVis = {.objectId = floor->id, .glyph = '.', .fgColor = 0x3e3c3cFF, .bgColor = 0x00000000, .visibleOutsideFOV = true};
+	Visibility floorVis = {.objectId = floor->id, .glyph = '.', .fgColor = 0x3e3c3cFF, .bgColor = 0x00000000, .visibleOutsideFOV = true, .name="Floor"};
 	game_object_update_component(floor, COMP_VISIBILITY, &floorVis);
 	Physical floorPhys = {.objectId = floor->id, .blocksMovement = false, .blocksSight = false};
 	game_object_update_component(floor, COMP_PHYSICAL, &floorPhys);
 }
 
-void npc_add(u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 toHit, i32 hitMod, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
+void npc_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 toHit, i32 hitMod, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
 	GameObject *npc = game_object_create();
 	Position pos = {.objectId = npc->id, .x = x, .y = y, .layer = layer};
 	game_object_update_component(npc, COMP_POSITION, &pos);
-	Visibility vis = {.objectId = npc->id, .glyph = glyph, .fgColor = fgColor, .bgColor = 0x00000000, .visibleOutsideFOV = false};
+	Visibility vis = {.objectId = npc->id, .glyph = glyph, .fgColor = fgColor, .bgColor = 0x00000000, .visibleOutsideFOV = false, .name = name};
 	game_object_update_component(npc, COMP_VISIBILITY, &vis);
 	Physical phys = {.objectId = npc->id, .blocksMovement = true, .blocksSight = false};
 	game_object_update_component(npc, COMP_PHYSICAL, &phys);
@@ -501,7 +514,7 @@ void wall_add(u8 x, u8 y) {
 	GameObject *wall = game_object_create();
 	Position wallPos = {.objectId = wall->id, .x = x, .y = y, .layer = LAYER_GROUND};
 	game_object_update_component(wall, COMP_POSITION, &wallPos);
-	Visibility wallVis = {wall->id, '#', 0x675644FF, 0x00000000, .visibleOutsideFOV = true};
+	Visibility wallVis = {wall->id, '#', 0x675644FF, 0x00000000, .visibleOutsideFOV = true, .name="Wall"};
 	game_object_update_component(wall, COMP_VISIBILITY, &wallVis);
 	Physical wallPhys = {wall->id, true, true};
 	game_object_update_component(wall, COMP_PHYSICAL, &wallPhys);
@@ -590,6 +603,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 		if (monsterConfig != NULL) {
 			// Add the monster		
 			Point pt = level_get_open_point(mapCells);
+			char *name = config_entity_value(monsterEntity, "name");
 			char *glyph = config_entity_value(monsterEntity, "vis_glyph");
 			asciiChar g = *glyph;
 			char *color = config_entity_value(monsterEntity, "vis_color");
@@ -606,7 +620,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			i32 att = atoi(config_entity_value(monsterEntity, "com_attack"));
 			i32 def = atoi(config_entity_value(monsterEntity, "com_defense"));
 
-			npc_add(pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, hit, 0, att, def, 0, 0, 0);
+			npc_add(name, pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, hit, 0, att, def, 0, 0, 0);
 		}
 	}
 	
@@ -628,7 +642,30 @@ void add_message(char *msg, u32 color) {
 	// TODO: When we build our UI system, have the messages display there. Also
 	// store them in a buffer so we can show the last few messages at once.
 	// For now, messages are just sent to stdout
+	Message *m = malloc(sizeof(Message));
+	if (msg != NULL) {
+		m->msg = malloc(strlen(msg));
+		strcpy(m->msg, msg);		
+	} else {
+		m->msg = "";
+	}
+	m->fgColor = color;
+
+	// Add message to log
+	if (messageLog == NULL) {
+		messageLog = list_new(NULL);
+	}
+	list_insert_after(messageLog, list_tail(messageLog), m);
+
+	// If our log has exceeded 20 messages, cull the older messages
+	if (list_size(messageLog) > 20) {
+		list_remove(messageLog, NULL);  // Remove the oldest message
+	}
+
+	// DEBUG
 	printf("%s\n", msg);
+	printf("Message Log Size: %d\n", list_size(messageLog));
+	// DEBUG
 }
 
 /* Movement System */
@@ -842,13 +879,14 @@ void health_check_death(GameObject *go) {
 			// TODO: Enter endgame flow
 
 		} else {
-			char *msg = NULL;
-			sasprintf(msg, "You killed the [MONSTER].");
-			add_message(msg, 0xCC0000FF);
 
 			Visibility *vis = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
 			vis->glyph = '%';
 			vis->fgColor = 0x990000FF;
+
+			char *msg = NULL;
+			sasprintf(msg, "You killed the %s.", vis->name);
+			add_message(msg, 0xCC0000FF);
 
 			Position *pos = (Position *)game_object_get_component(go, COMP_POSITION);
 			pos->layer = LAYER_GROUND;
@@ -934,7 +972,15 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 			add_message(msg, 0xCCCCCCFF);
 		}
 
+
 		defHealth->currentHP -= (totAtt - totDef);
+
+		// DEBUG
+		char *msg = NULL;
+		sasprintf(msg, "Current HP: %d", defHealth->currentHP);
+		add_message(msg, 0xCCCCCCFF);
+		// DEBUG
+
 		health_check_death(defender);
 	}
 }
