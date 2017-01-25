@@ -250,8 +250,10 @@ void game_object_update_component(GameObject *obj,
 		case COMP_POSITION: {
 			if (compData != NULL) {
 				Position *pos = obj->components[COMP_POSITION];
+				bool addedNew = false;
 				if (pos == NULL) {
 					pos = (Position *)malloc(sizeof(Position));
+					addedNew = true;
 				} else {
 					// Remove game obj from the position helper DS
 					List *ls = goPositions[pos->x][pos->y];
@@ -263,7 +265,11 @@ void game_object_update_component(GameObject *obj,
 				pos->y = posData->y;
 				pos->layer = posData->layer;
 
-				list_insert_after(positionComps, NULL, pos);
+				// Only insert into world component list if we just allocated a new component
+				if (addedNew) {
+					list_insert_after(positionComps, NULL, pos);					
+				}
+	
 				obj->components[comp] = pos;
 
 				// Update our helper DS 
@@ -278,7 +284,7 @@ void game_object_update_component(GameObject *obj,
 				// Clear component 
 				Position *pos = obj->components[COMP_POSITION];
 				if (pos != NULL) {
-					list_remove_element_with_data(positionComps, pos);				
+					list_remove_element_with_data(positionComps, pos);	
 				}
 				obj->components[comp] = NULL;
 
@@ -293,8 +299,10 @@ void game_object_update_component(GameObject *obj,
 		case COMP_VISIBILITY: {
 			if (compData != NULL) {
 				Visibility *vis = obj->components[COMP_VISIBILITY];
+				bool addedNew = false;
 				if (vis == NULL)  {
 					vis = (Visibility *)malloc(sizeof(Visibility));
+					addedNew = true;
 				}
 				Visibility *visData = (Visibility *)compData;
 				vis->objectId = obj->id;
@@ -304,11 +312,14 @@ void game_object_update_component(GameObject *obj,
 				vis->hasBeenSeen = visData->hasBeenSeen;
 				vis->visibleOutsideFOV = visData->visibleOutsideFOV;
 				if (visData->name != NULL) {
-					vis->name = malloc(strlen(visData->name));
+					vis->name = malloc(strlen(visData->name) + 1);
 					strcpy(vis->name, visData->name);
 				}
 
-				list_insert_after(visibilityComps, NULL, vis);
+				if (addedNew) {
+					list_insert_after(visibilityComps, NULL, vis);					
+				}
+	
 				obj->components[comp] = vis;
 
 			} else {
@@ -326,15 +337,19 @@ void game_object_update_component(GameObject *obj,
 		case COMP_PHYSICAL: {
 			if (compData != NULL) {
 				Physical *phys = obj->components[COMP_PHYSICAL];
+				bool addedNew = false;
 				if (phys == NULL) {
 					phys = (Physical *)malloc(sizeof(Physical));
+					addedNew = true;
 				}
 				Physical *physData = (Physical *)compData;
 				phys->objectId = obj->id;
 				phys->blocksSight = physData->blocksSight;
 				phys->blocksMovement = physData->blocksMovement;
 
-				list_insert_after(physicalComps, NULL, phys);
+				if (addedNew) {
+					list_insert_after(physicalComps, NULL, phys);					
+				}
 				obj->components[comp] = phys;
 
 			} else {
@@ -352,8 +367,10 @@ void game_object_update_component(GameObject *obj,
 		case COMP_MOVEMENT: {
 			if (compData != NULL) {
 				Movement *mv = obj->components[COMP_MOVEMENT];
+				bool addedNew = false;
 				if (mv == NULL) {
 					mv = (Movement *)malloc(sizeof(Movement));
+					addedNew = true;
 				}
 				Movement *mvData = (Movement *)compData;
 				mv->objectId = obj->id;
@@ -363,7 +380,9 @@ void game_object_update_component(GameObject *obj,
 				mv->chasingPlayer = mvData->chasingPlayer;
 				mv->turnsSincePlayerSeen = mvData->turnsSincePlayerSeen;
 
-				list_insert_after(movementComps, NULL, mv);
+				if (addedNew) {
+					list_insert_after(movementComps, NULL, mv);				
+				}
 				obj->components[comp] = mv;
 
 			} else {
@@ -381,8 +400,10 @@ void game_object_update_component(GameObject *obj,
 		case COMP_HEALTH: {
 			if (compData != NULL) {
 				Health *hlth = obj->components[COMP_HEALTH];
+				bool addedNew = false;
 				if (hlth == NULL) {
 					hlth = (Health *)malloc(sizeof(Health));
+					addedNew = true;
 				}
 				Health *hlthData = (Health *)compData;
 				hlth->objectId = obj->id;
@@ -391,7 +412,9 @@ void game_object_update_component(GameObject *obj,
 				hlth->recoveryRate = hlthData->recoveryRate;
 				hlth->ticksUntilRemoval = hlthData->ticksUntilRemoval;
 
-				list_insert_after(healthComps, NULL, hlth);
+				if (addedNew) {
+					list_insert_after(healthComps, NULL, hlth);				
+				}
 				obj->components[comp] = hlth;
 
 			} else {
@@ -409,8 +432,10 @@ void game_object_update_component(GameObject *obj,
 		case COMP_COMBAT: {
 			if (compData != NULL) {
 				Combat *com = obj->components[COMP_COMBAT];
+				bool addedNew = false;
 				if (com == NULL) {
 					com = (Combat *)malloc(sizeof(Combat));
+					addedNew = true;
 				}
 				Combat *combatData = (Combat *)compData;
 				com->objectId = obj->id;
@@ -422,7 +447,9 @@ void game_object_update_component(GameObject *obj,
 				com->defenseModifier = combatData->defenseModifier;
 				com->hitModifier = combatData->hitModifier;
 
-				list_insert_after(combatComps, NULL, com);
+				if (addedNew) {
+					list_insert_after(combatComps, NULL, com);				
+				}
 				obj->components[comp] = com;
 				
 			} else {
@@ -642,7 +669,7 @@ void add_message(char *msg, u32 color) {
 
 	Message *m = malloc(sizeof(Message));
 	if (msg != NULL) {
-		m->msg = malloc(strlen(msg));
+		m->msg = malloc(strlen(msg) + 1);
 		strcpy(m->msg, msg);		
 	} else {
 		m->msg = "";
