@@ -158,15 +158,19 @@ int main(int argc, char *argv[]) {
 	PT_ConsoleSetBitmapFont(igConsole, "./terminal16x16.png", 0, 16, 16);
 	List *igViews = list_new(NULL);
 
-	UIView mapView = {.render = gameMapRender};
-	list_insert_after(igViews, NULL, &mapView);
+	UIView *mapView = malloc(sizeof(UIView));
+	mapView->render = gameMapRender;
+	list_insert_after(igViews, NULL, mapView);
 
-	UIView logView = {.render = messageLogRender};
-	list_insert_after(igViews, NULL, &logView);
+	UIView *logView = malloc(sizeof(UIView));
+	logView->render = messageLogRender;
+	list_insert_after(igViews, NULL, logView);
 
-	UIScreen inGameScreen = {.console = igConsole, .views = igViews};
+	UIScreen *inGameScreen = malloc(sizeof(UIScreen));
+	inGameScreen->console = igConsole;
+	inGameScreen->views = igViews;
 
-	activeScreen = &inGameScreen;
+	activeScreen = inGameScreen;
 
 
 	world_state_init();

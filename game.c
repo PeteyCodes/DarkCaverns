@@ -639,9 +639,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 
 /* Message */
 void add_message(char *msg, u32 color) {
-	// TODO: When we build our UI system, have the messages display there. Also
-	// store them in a buffer so we can show the last few messages at once.
-	// For now, messages are just sent to stdout
+
 	Message *m = malloc(sizeof(Message));
 	if (msg != NULL) {
 		m->msg = malloc(strlen(msg));
