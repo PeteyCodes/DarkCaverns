@@ -65,7 +65,7 @@ void render_screen(SDL_Renderer *renderer,
 	SDL_RenderPresent(renderer);
 }
 
-internal gameMapRender(PT_Console *console) {
+internal void gameMapRender(PT_Console *console) {
 
 	// Setup layer render history  
 	u8 layerRendered[MAP_WIDTH][MAP_HEIGHT];
@@ -104,27 +104,43 @@ internal gameMapRender(PT_Console *console) {
 internal void statsRender(PT_Console *console) {
 	
 	PT_Rect rect = {0, 40, 20, 5};
-	UI_DrawRect(console, &rect, 0x000000FF, 2, 0xFF990099);
+	UI_DrawRect(console, &rect, 0x222222FF, 0, 0xFF990099);
 
 	// HP health bar
 	Health *playerHealth = game_object_get_component(player, COMP_HEALTH);
-	PT_ConsolePutCharAt(console, 'H', 1, 41, 0xFF990099, 0x00000000);
-	PT_ConsolePutCharAt(console, 'P', 2, 41, 0xFF990099, 0x00000000);
+	PT_ConsolePutCharAt(console, 'H', 0, 41, 0xFF990099, 0x00000000);
+	PT_ConsolePutCharAt(console, 'P', 1, 41, 0xFF990099, 0x00000000);
 	i32 leftX = 3;
 	i32 barWidth = 16;
 
 	i32 healthCount = ceil(((float)playerHealth->currentHP / (float)playerHealth->maxHP) * barWidth);
 	for (i32 x = 0; x < barWidth; x++) {
 		if (x < healthCount) {
-			PT_ConsolePutCharAt(console, '#', leftX + x, 41, 0x009900FF, 0x00000000);		
+			PT_ConsolePutCharAt(console, 176, leftX + x, 41, 0x009900FF, 0x00000000);		
+			PT_ConsolePutCharAt(console, 3, leftX + x, 41, 0x009900FF, 0x00000000);		
 		} else {
-			PT_ConsolePutCharAt(console, '#', leftX + x, 41, 0xFF990099, 0x00000000);		
+			PT_ConsolePutCharAt(console, 176, leftX + x, 41, 0xFF990099, 0x00000000);		
 		}
 	}
+
+	Combat *playerCombat = game_object_get_component(player, COMP_COMBAT);
+	char *att = NULL;
+	sasprintf(att, "ATT: %d (%d)", playerCombat->attack, playerCombat->attackModifier);
+	PT_ConsolePutStringAt(console, att, 0, 42, 0xe6e600FF, 0x00000000);
+	free(att);
+
+	char *def = NULL;
+	sasprintf(def, "DEF: %d (%d)", playerCombat->defense, playerCombat->defenseModifier);
+	PT_ConsolePutStringAt(console, def, 0, 43, 0xe6e600FF, 0x00000000);
+	free(def);
 
 }
 
 internal void messageLogRender(PT_Console *console) {
+
+	PT_Rect rect = {30, 40, 50, 5};
+	UI_DrawRect(console, &rect, 0x111111FF, 0, 0xFF990099);
+
 	if (messageLog == NULL) { return; }
 
 	// Get the last 5 messages from the log

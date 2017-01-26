@@ -147,6 +147,16 @@ PT_ConsolePutCharAt(PT_Console *con, asciiChar c,
                  &fgColor);
 }
 
+internal void 
+PT_ConsolePutStringAt(PT_Console *con, char *string, 
+                      i32 x, i32 y,
+                      u32 fgColor, u32 bgColor) {
+    i32 len = strlen(string);
+    for (i32 i = 0; i < len; i++) {
+        PT_ConsolePutCharAt(con, (asciiChar)string[i], x+i, y, fgColor, bgColor);
+    }
+}
+
 internal void
 PT_ConsolePutStringInRect(PT_Console *con, char *string,
                           PT_Rect rect, bool wrap, 
