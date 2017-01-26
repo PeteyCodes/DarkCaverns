@@ -38,7 +38,7 @@ typedef struct {
 /* UI Utility Functions **/
 
 internal void 
-UI_DrawRect(UIState *ui, PT_Rect *rect, u32 color, 
+UI_DrawRect(PT_Console *console, PT_Rect *rect, u32 color, 
             i32 borderWidth, u32 borderColor)
 {
     for (i32 y = rect->y; y < rect->y + rect->h; y++) {
@@ -79,7 +79,7 @@ UI_DrawRect(UIState *ui, PT_Rect *rect, u32 color,
                     }
                 }
             }
-            PT_ConsolePutCharAt(ui->console, c, y, x, borderColor, color);
+            PT_ConsolePutCharAt(console, c, x, y, borderColor, color);
         }
     }
 }
@@ -141,11 +141,11 @@ UI_Button(UIState *ui, u32 id, PT_Rect *rect)
 
     // Now render the button
     if (ui->hotItem == id && ui->activeItem == id) {
-        UI_DrawRect(ui, rect, 0x00ff00ff, 1, 0xffffffff);
+        UI_DrawRect(ui->console, rect, 0x00ff00ff, 1, 0xffffffff);
     } else if (ui->hotItem == id) {
-        UI_DrawRect(ui, rect, 0x00ff0099, 1, 0xffffffff);
+        UI_DrawRect(ui->console, rect, 0x00ff0099, 1, 0xffffffff);
     } else {
-        UI_DrawRect(ui, rect, 0x00ff0055, 1, 0xffffffff);
+        UI_DrawRect(ui->console, rect, 0x00ff0055, 1, 0xffffffff);
     }
 
 

@@ -101,6 +101,29 @@ internal gameMapRender(PT_Console *console) {
 
 }
 
+internal void statsRender(PT_Console *console) {
+	
+	PT_Rect rect = {0, 40, 20, 5};
+	UI_DrawRect(console, &rect, 0x000000FF, 2, 0xFF990099);
+
+	// HP health bar
+	Health *playerHealth = game_object_get_component(player, COMP_HEALTH);
+	PT_ConsolePutCharAt(console, 'H', 1, 41, 0xFF990099, 0x00000000);
+	PT_ConsolePutCharAt(console, 'P', 2, 41, 0xFF990099, 0x00000000);
+	i32 leftX = 3;
+	i32 barWidth = 16;
+
+	i32 healthCount = ceil(((float)playerHealth->currentHP / (float)playerHealth->maxHP) * barWidth);
+	for (i32 x = 0; x < barWidth; x++) {
+		if (x < healthCount) {
+			PT_ConsolePutCharAt(console, '#', leftX + x, 41, 0x009900FF, 0x00000000);		
+		} else {
+			PT_ConsolePutCharAt(console, '#', leftX + x, 41, 0xFF990099, 0x00000000);		
+		}
+	}
+
+}
+
 internal void messageLogRender(PT_Console *console) {
 	if (messageLog == NULL) { return; }
 
@@ -146,12 +169,8 @@ int main(int argc, char *argv[]) {
 
 	SDL_Texture *screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	// PT_Console *console = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, 
-	// 									 NUM_ROWS, NUM_COLS);
-
-	// PT_ConsoleSetBitmapFont(console, "./terminal16x16.png", 0, 16, 16);
-
-	// TODO: Initialize UI state (screens, view stack, etc)
+	// Initialize UI state (screens, view stack, etc)
+	// TODO: Move this somewhere else
 	UIScreen *activeScreen = NULL;
 
 	PT_Console *igConsole = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, NUM_ROWS, NUM_COLS);
@@ -161,6 +180,10 @@ int main(int argc, char *argv[]) {
 	UIView *mapView = malloc(sizeof(UIView));
 	mapView->render = gameMapRender;
 	list_insert_after(igViews, NULL, mapView);
+
+	UIView *statsView = malloc(sizeof(UIView));
+	statsView->render = statsRender;
+	list_insert_after(igViews, NULL, statsView);
 
 	UIView *logView = malloc(sizeof(UIView));
 	logView->render = messageLogRender;
@@ -173,6 +196,7 @@ int main(int argc, char *argv[]) {
 	activeScreen = inGameScreen;
 
 
+	// TODO: Move this somewhere else - group with other game startup code
 	world_state_init();
 
 	// Create our player
