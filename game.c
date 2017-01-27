@@ -925,6 +925,16 @@ void health_check_death(GameObject *go) {
 	}
 }
 
+void health_recover_player_only() {
+	Health *h = game_object_get_component(player, COMP_HEALTH);
+	if (h->currentHP > 0) {
+		h->currentHP += h->recoveryRate;
+		if (h->currentHP > h->maxHP) { 
+			h->currentHP = h->maxHP;
+		}			
+	}
+}
+
 void health_recover() {
 	// Loop through all our health components and apply recovery HP (only if object is not already dead)
 	ListElement *e = list_head(healthComps);

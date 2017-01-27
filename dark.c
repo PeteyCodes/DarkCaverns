@@ -138,8 +138,8 @@ internal void statsRender(PT_Console *console) {
 
 internal void messageLogRender(PT_Console *console) {
 
-	PT_Rect rect = {30, 40, 50, 5};
-	UI_DrawRect(console, &rect, 0x111111FF, 0, 0xFF990099);
+	PT_Rect rect = {22, 40, 58, 5};
+	UI_DrawRect(console, &rect, 0x191919FF, 0, 0xFF990099);
 
 	if (messageLog == NULL) { return; }
 
@@ -147,7 +147,7 @@ internal void messageLogRender(PT_Console *console) {
 	ListElement *e = list_tail(messageLog);
 	i32 msgCount = list_size(messageLog);
 	u32 row = 44;
-	u32 col = 30;
+	u32 col = 22;
 
 	if (msgCount < 5) {
 		row -= (5 - msgCount);
@@ -158,7 +158,7 @@ internal void messageLogRender(PT_Console *console) {
 	for (i32 i = 0; i < msgCount; i++) {
 		if (e != NULL) {
 			Message *m = (Message *)list_data(e);
-			PT_Rect rect = {.x = col, .y = row, .w = 50, .h = 1};
+			PT_Rect rect = {.x = col, .y = row, .w = 58, .h = 1};
 			PT_ConsolePutStringInRect(console, m->msg, rect, false, m->fgColor, 0x00000000);
 			e = list_prev(e);			
 			row -= 1;
@@ -238,9 +238,10 @@ int main(int argc, char *argv[]) {
 
 	bool done = false;
 	bool recalculateFOV = false;
-	bool playerMoved = false;
+	bool playerTookTurn = false;
+
 	while (!done) {
-		playerMoved = false;
+		playerTookTurn = false;
 
 		SDL_Event event;
 		u32 timePerFrame = 1000 / FPS_LIMIT;
@@ -281,7 +282,7 @@ int main(int argc, char *argv[]) {
 						if (can_move(newPos)) {
 							game_object_update_component(player, COMP_POSITION, &newPos);
 							recalculateFOV = true;					
-							playerMoved = true;		
+							playerTookTurn = true;		
 
 						} else {
 							// Check to see what is blocking movement. If NPC - resolve combat!
@@ -299,7 +300,7 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
-								playerMoved = true;		
+								playerTookTurn = true;		
 							}
 						}	
 					}
@@ -310,7 +311,7 @@ int main(int argc, char *argv[]) {
 						if (can_move(newPos)) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
-							playerMoved = true;		
+							playerTookTurn = true;		
 						} else {
 							// Check to see what is blocking movement. If NPC - resolve combat!
 							List *blockers = game_objects_at_position(playerPos->x, playerPos->y + 1);
@@ -327,7 +328,7 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
-								playerMoved = true;		
+								playerTookTurn = true;		
 							}
 						}	
 					}
@@ -338,7 +339,7 @@ int main(int argc, char *argv[]) {
 						if (can_move(newPos)) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
-							playerMoved = true;		
+							playerTookTurn = true;		
 						} else {
 							// Check to see what is blocking movement. If NPC - resolve combat!
 							List *blockers = game_objects_at_position(playerPos->x - 1, playerPos->y);
@@ -355,7 +356,7 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
-								playerMoved = true;		
+								playerTookTurn = true;		
 							}
 						}	
 					}
@@ -366,7 +367,7 @@ int main(int argc, char *argv[]) {
 						if (can_move(newPos)) {
 							game_object_update_component(player, COMP_POSITION, &newPos);							
 							recalculateFOV = true;							
-							playerMoved = true;		
+							playerTookTurn = true;		
 
 						} else {
 							// Check to see what is blocking movement. If NPC - resolve combat!
@@ -384,9 +385,16 @@ int main(int argc, char *argv[]) {
 							}
 							if (blockerObj != NULL) {
 								combat_attack(player, blockerObj);
-								playerMoved = true;		
+								playerTookTurn = true;		
 							}
 						}	
+					}
+					break;
+
+					case SDLK_z: {
+						// Player rests
+						health_recover_player_only();
+						playerTookTurn = true;
 					}
 					break;
 
@@ -397,12 +405,11 @@ int main(int argc, char *argv[]) {
 		}
 
 		// Have things move themselves around the dungeon if the player moved
-		if (playerMoved) {
+		if (playerTookTurn) {
 			Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 			generate_target_map(playerPos->x, playerPos->y);
 			movement_update();			
 
-			health_recover();
 			health_removal_update();
 		}
 
