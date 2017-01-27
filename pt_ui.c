@@ -25,12 +25,13 @@ typedef struct {
 } UIState;
 
 typedef struct {
-    PT_Console *console;
     List *views;
 } UIScreen;
 
 typedef void (*RenderFunction)(PT_Console *);
 typedef struct {
+    PT_Console *console;
+    SDL_Rect* rect;
     RenderFunction render;
 } UIView;
 

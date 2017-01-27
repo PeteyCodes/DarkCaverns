@@ -45,21 +45,29 @@ typedef int64_t		i64;
 #include "fov.c"
 
 
+// TODO: Move these elsewhere?
+#define STATS_WIDTH		20
+#define STATS_HEIGHT 	5
+
+#define LOG_WIDTH		58
+#define LOG_HEIGHT		5
+
+
 void render_screen(SDL_Renderer *renderer, 
 				  SDL_Texture *screenTexture, 
 				  UIScreen *screen) {
 
-	PT_ConsoleClear(screen->console);
 
 	// Render views from back to front for the current screen
 	ListElement *e = list_head(screen->views);
 	while (e != NULL) {
 		UIView *v = (UIView *)list_data(e);
-		v->render(screen->console);
+		PT_ConsoleClear(v->console);
+		v->render(v->console);
+		SDL_UpdateTexture(screenTexture, v->rect, v->console->pixels, v->rect->w * sizeof(u32));
 		e = list_next(e);
 	}
 
-	SDL_UpdateTexture(screenTexture, NULL, screen->console->pixels, SCREEN_WIDTH * sizeof(u32));
 	SDL_RenderClear(renderer);
 	SDL_RenderCopy(renderer, screenTexture, NULL, NULL);
 	SDL_RenderPresent(renderer);
@@ -103,42 +111,42 @@ internal void gameMapRender(PT_Console *console) {
 
 internal void statsRender(PT_Console *console) {
 	
-	PT_Rect rect = {0, 40, 20, 5};
+	PT_Rect rect = {0, 0, STATS_WIDTH, STATS_HEIGHT};
 	UI_DrawRect(console, &rect, 0x222222FF, 0, 0xFF990099);
 
 	// HP health bar
 	Health *playerHealth = game_object_get_component(player, COMP_HEALTH);
-	PT_ConsolePutCharAt(console, 'H', 0, 41, 0xFF990099, 0x00000000);
-	PT_ConsolePutCharAt(console, 'P', 1, 41, 0xFF990099, 0x00000000);
+	PT_ConsolePutCharAt(console, 'H', 0, 1, 0xFF990099, 0x00000000);
+	PT_ConsolePutCharAt(console, 'P', 1, 1, 0xFF990099, 0x00000000);
 	i32 leftX = 3;
 	i32 barWidth = 16;
 
 	i32 healthCount = ceil(((float)playerHealth->currentHP / (float)playerHealth->maxHP) * barWidth);
 	for (i32 x = 0; x < barWidth; x++) {
 		if (x < healthCount) {
-			PT_ConsolePutCharAt(console, 176, leftX + x, 41, 0x009900FF, 0x00000000);		
-			PT_ConsolePutCharAt(console, 3, leftX + x, 41, 0x009900FF, 0x00000000);		
+			PT_ConsolePutCharAt(console, 176, leftX + x, 1, 0x009900FF, 0x00000000);		
+			PT_ConsolePutCharAt(console, 3, leftX + x, 1, 0x009900FF, 0x00000000);		
 		} else {
-			PT_ConsolePutCharAt(console, 176, leftX + x, 41, 0xFF990099, 0x00000000);		
+			PT_ConsolePutCharAt(console, 176, leftX + x, 1, 0xFF990099, 0x00000000);		
 		}
 	}
 
 	Combat *playerCombat = game_object_get_component(player, COMP_COMBAT);
 	char *att = NULL;
 	sasprintf(att, "ATT: %d (%d)", playerCombat->attack, playerCombat->attackModifier);
-	PT_ConsolePutStringAt(console, att, 0, 42, 0xe6e600FF, 0x00000000);
+	PT_ConsolePutStringAt(console, att, 0, 2, 0xe6e600FF, 0x00000000);
 	free(att);
 
 	char *def = NULL;
 	sasprintf(def, "DEF: %d (%d)", playerCombat->defense, playerCombat->defenseModifier);
-	PT_ConsolePutStringAt(console, def, 0, 43, 0xe6e600FF, 0x00000000);
+	PT_ConsolePutStringAt(console, def, 0, 3, 0xe6e600FF, 0x00000000);
 	free(def);
 
 }
 
 internal void messageLogRender(PT_Console *console) {
 
-	PT_Rect rect = {22, 40, 58, 5};
+	PT_Rect rect = {0, 0, LOG_WIDTH, LOG_HEIGHT};
 	UI_DrawRect(console, &rect, 0x191919FF, 0, 0xFF990099);
 
 	if (messageLog == NULL) { return; }
@@ -146,8 +154,8 @@ internal void messageLogRender(PT_Console *console) {
 	// Get the last 5 messages from the log
 	ListElement *e = list_tail(messageLog);
 	i32 msgCount = list_size(messageLog);
-	u32 row = 44;
-	u32 col = 22;
+	u32 row = 4;
+	u32 col = 0;
 
 	if (msgCount < 5) {
 		row -= (5 - msgCount);
@@ -158,7 +166,7 @@ internal void messageLogRender(PT_Console *console) {
 	for (i32 i = 0; i < msgCount; i++) {
 		if (e != NULL) {
 			Message *m = (Message *)list_data(e);
-			PT_Rect rect = {.x = col, .y = row, .w = 58, .h = 1};
+			PT_Rect rect = {.x = col, .y = row, .w = LOG_WIDTH, .h = 1};
 			PT_ConsolePutStringInRect(console, m->msg, rect, false, m->fgColor, 0x00000000);
 			e = list_prev(e);			
 			row -= 1;
@@ -189,24 +197,48 @@ int main(int argc, char *argv[]) {
 	// TODO: Move this somewhere else
 	UIScreen *activeScreen = NULL;
 
-	PT_Console *igConsole = PT_ConsoleInit(SCREEN_WIDTH, SCREEN_HEIGHT, NUM_ROWS, NUM_COLS);
-	PT_ConsoleSetBitmapFont(igConsole, "./terminal16x16.png", 0, 16, 16);
 	List *igViews = list_new(NULL);
 
 	UIView *mapView = malloc(sizeof(UIView));
+	SDL_Rect *mapRect = malloc(sizeof(SDL_Rect));
+	mapRect->x = 0;
+	mapRect->y = 0;
+	mapRect->w = (16 * MAP_WIDTH);
+	mapRect->h = (16 * MAP_HEIGHT);
+	PT_Console *mapConsole = PT_ConsoleInit(mapRect->w, mapRect->h, MAP_HEIGHT, MAP_WIDTH);
+	PT_ConsoleSetBitmapFont(mapConsole, "./terminal16x16.png", 0, 16, 16);
+	mapView->console = mapConsole;
+	mapView->rect = mapRect;
 	mapView->render = gameMapRender;
 	list_insert_after(igViews, NULL, mapView);
 
 	UIView *statsView = malloc(sizeof(UIView));
+	SDL_Rect *statsRect = malloc(sizeof(SDL_Rect));
+	statsRect->x = 0;
+	statsRect->y = (16 * MAP_HEIGHT);
+	statsRect->w = (16 * STATS_WIDTH);
+	statsRect->h = (16 * STATS_HEIGHT);
+	PT_Console *statsConsole = PT_ConsoleInit(statsRect->w, statsRect->h, STATS_HEIGHT, STATS_WIDTH);
+	PT_ConsoleSetBitmapFont(statsConsole, "./terminal16x16.png", 0, 16, 16);
+	statsView->console = statsConsole;
+	statsView->rect = statsRect;
 	statsView->render = statsRender;
 	list_insert_after(igViews, NULL, statsView);
 
 	UIView *logView = malloc(sizeof(UIView));
+	SDL_Rect *logRect = malloc(sizeof(SDL_Rect));
+	logRect->x = (16 * 22);
+	logRect->y = (16 * MAP_HEIGHT);
+	logRect->w = (16 * LOG_WIDTH);
+	logRect->h = (16 * LOG_HEIGHT);
+	PT_Console *logConsole = PT_ConsoleInit(logRect->w, logRect->h, LOG_HEIGHT, LOG_WIDTH);
+	PT_ConsoleSetBitmapFont(logConsole, "./terminal16x16.png", 0, 16, 16);
+	logView->console = logConsole;
+	logView->rect = logRect;
 	logView->render = messageLogRender;
 	list_insert_after(igViews, NULL, logView);
 
 	UIScreen *inGameScreen = malloc(sizeof(UIScreen));
-	inGameScreen->console = igConsole;
 	inGameScreen->views = igViews;
 
 	activeScreen = inGameScreen;
