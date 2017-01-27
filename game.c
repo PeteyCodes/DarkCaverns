@@ -687,10 +687,6 @@ void add_message(char *msg, u32 color) {
 		list_remove(messageLog, NULL);  // Remove the oldest message
 	}
 
-	// DEBUG
-	printf("%s\n", msg);
-	printf("Message Log Size: %d\n", list_size(messageLog));
-	// DEBUG
 }
 
 /* Movement System */
@@ -900,7 +896,7 @@ void health_check_death(GameObject *go) {
 			char *msg = NULL;
 			sasprintf(msg, "You have died.");
 			add_message(msg, 0xCC0000FF);
-
+			free(msg);
 			// TODO: Enter endgame flow
 
 		} else {
@@ -911,7 +907,8 @@ void health_check_death(GameObject *go) {
 
 			char *msg = NULL;
 			sasprintf(msg, "You killed the %s.", vis->name);
-			add_message(msg, 0xCC0000FF);
+			add_message(msg, 0xff9900FF);
+			free(msg);
 
 			Position *pos = (Position *)game_object_get_component(go, COMP_POSITION);
 			pos->layer = LAYER_GROUND;
@@ -987,24 +984,22 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 
 	} else {
 		if (attacker == player) {
+			Visibility *vis = game_object_get_component(defender, COMP_VISIBILITY);
 			char *msg = NULL;
-			sasprintf(msg, "You hit for %d damage.", (totAtt - totDef));
+			sasprintf(msg, "You hit the %s for %d damage.", vis->name, (totAtt - totDef));
 			add_message(msg, 0xCCCCCCFF);
+			free(msg);
 
 		} else {
+			Visibility *vis = game_object_get_component(attacker, COMP_VISIBILITY);
 			char *msg = NULL;
-			sasprintf(msg, "It hits for %d damage.", (totAtt - totDef));
+			sasprintf(msg, "The %s hits you for %d damage.", vis->name, (totAtt - totDef));
 			add_message(msg, 0xCCCCCCFF);
+			free(msg);
 		}
 
 
 		defHealth->currentHP -= (totAtt - totDef);
-
-		// DEBUG
-		char *msg = NULL;
-		sasprintf(msg, "Current HP: %d", defHealth->currentHP);
-		add_message(msg, 0xCCCCCCFF);
-		// DEBUG
 
 		health_check_death(defender);
 	}
@@ -1018,13 +1013,6 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	i32 hitWindow = (att->toHit + att->toHitModifier) - def->hitModifier;
 	if (hitRoll < hitWindow) {
 		// We have a hit
-		char *msg = NULL;
-		sasprintf(msg, "The attack hits.");
-		add_message(msg, 0xCCCCCCFF);
 		combat_deal_damage(attacker, defender);
-
-	} else {
-		// Miss
-		add_message("The attack missed.", 0xFFFFFFFF);
 	}
 }

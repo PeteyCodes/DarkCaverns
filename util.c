@@ -58,21 +58,6 @@ int asprintf(char **str, char* fmt, ...){
 }
 #endif
 
-#ifdef Test_asprintf
-int main(){
-    char *s;
-    asprintf(&s, "hello, %s.", "—Reader—");
-    printf("%s\n", s);
-
-    asprintf(&s, "%c", '\0');
-    printf("blank string: [%s]\n", s);
-
-    int i = 0;
-    asprintf(&s, "%i", i++);
-    printf("Zero: %s\n", s);
-}
-#endif
-
 /* Macro for clean string extending with formatting */
 #define sasprintf(write_to, ...) {		\
 	char *temp = (write_to);			\
