@@ -31,10 +31,38 @@ typedef struct {
 typedef void (*RenderFunction)(PT_Console *);
 typedef struct {
     PT_Console *console;
-    SDL_Rect* rect;
+    PT_Rect *pixelRect;
     RenderFunction render;
 } UIView;
 
+
+
+/* Data Structure Helper Functions */
+
+internal UIView * view_new(PT_Rect pixelRect, u32 cellCountX, u32 cellCountY, 
+                           char *fontFile, asciiChar firstCharInAtlas,
+                           RenderFunction renderFn) {
+
+    UIView *view = malloc(sizeof(UIView));
+    PT_Rect *rect = malloc(sizeof(PT_Rect));
+
+    memcpy(rect, &pixelRect, sizeof(PT_Rect));
+    PT_Console *console = PT_ConsoleInit(rect->w, rect->h, cellCountY, cellCountX);
+
+    i32 cellWidthPixels = pixelRect.w / cellCountX;
+    i32 cellHeightPixels = pixelRect.h / cellCountY;
+    PT_ConsoleSetBitmapFont(console, fontFile, firstCharInAtlas, cellWidthPixels, cellHeightPixels);
+
+    view->console = console;
+    view->pixelRect = rect;
+    view->render = renderFn;
+
+    return view;
+}
+
+internal void view_destroy(UIView *view) {
+    // TODO
+}
 
 /* UI Utility Functions **/
 

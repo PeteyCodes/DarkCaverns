@@ -64,7 +64,7 @@ void render_screen(SDL_Renderer *renderer,
 		UIView *v = (UIView *)list_data(e);
 		PT_ConsoleClear(v->console);
 		v->render(v->console);
-		SDL_UpdateTexture(screenTexture, v->rect, v->console->pixels, v->rect->w * sizeof(u32));
+		SDL_UpdateTexture(screenTexture, v->pixelRect, v->console->pixels, v->pixelRect->w * sizeof(u32));
 		e = list_next(e);
 	}
 
@@ -199,43 +199,19 @@ int main(int argc, char *argv[]) {
 
 	List *igViews = list_new(NULL);
 
-	UIView *mapView = malloc(sizeof(UIView));
-	SDL_Rect *mapRect = malloc(sizeof(SDL_Rect));
-	mapRect->x = 0;
-	mapRect->y = 0;
-	mapRect->w = (16 * MAP_WIDTH);
-	mapRect->h = (16 * MAP_HEIGHT);
-	PT_Console *mapConsole = PT_ConsoleInit(mapRect->w, mapRect->h, MAP_HEIGHT, MAP_WIDTH);
-	PT_ConsoleSetBitmapFont(mapConsole, "./terminal16x16.png", 0, 16, 16);
-	mapView->console = mapConsole;
-	mapView->rect = mapRect;
-	mapView->render = gameMapRender;
+	PT_Rect mapRect = {0, 0, (16 * MAP_WIDTH), (16 * MAP_HEIGHT)};
+	UIView *mapView = view_new(mapRect, MAP_WIDTH, MAP_HEIGHT, 
+							   "./terminal16x16.png", 0, gameMapRender);
 	list_insert_after(igViews, NULL, mapView);
 
-	UIView *statsView = malloc(sizeof(UIView));
-	SDL_Rect *statsRect = malloc(sizeof(SDL_Rect));
-	statsRect->x = 0;
-	statsRect->y = (16 * MAP_HEIGHT);
-	statsRect->w = (16 * STATS_WIDTH);
-	statsRect->h = (16 * STATS_HEIGHT);
-	PT_Console *statsConsole = PT_ConsoleInit(statsRect->w, statsRect->h, STATS_HEIGHT, STATS_WIDTH);
-	PT_ConsoleSetBitmapFont(statsConsole, "./terminal16x16.png", 0, 16, 16);
-	statsView->console = statsConsole;
-	statsView->rect = statsRect;
-	statsView->render = statsRender;
+	PT_Rect statsRect = {0, (16 * MAP_HEIGHT), (16 * STATS_WIDTH), (16 * STATS_HEIGHT)};
+	UIView *statsView = view_new(statsRect, STATS_WIDTH, STATS_HEIGHT,
+								 "./terminal16x16.png", 0, statsRender);
 	list_insert_after(igViews, NULL, statsView);
 
-	UIView *logView = malloc(sizeof(UIView));
-	SDL_Rect *logRect = malloc(sizeof(SDL_Rect));
-	logRect->x = (16 * 22);
-	logRect->y = (16 * MAP_HEIGHT);
-	logRect->w = (16 * LOG_WIDTH);
-	logRect->h = (16 * LOG_HEIGHT);
-	PT_Console *logConsole = PT_ConsoleInit(logRect->w, logRect->h, LOG_HEIGHT, LOG_WIDTH);
-	PT_ConsoleSetBitmapFont(logConsole, "./terminal16x16.png", 0, 16, 16);
-	logView->console = logConsole;
-	logView->rect = logRect;
-	logView->render = messageLogRender;
+	PT_Rect logRect = {(16 * 22), (16 * MAP_HEIGHT), (16 * LOG_WIDTH), (16 * LOG_HEIGHT)};
+	UIView *logView = view_new(logRect, LOG_WIDTH, LOG_HEIGHT,
+							   "./terminal16x16.png", 0, messageLogRender);
 	list_insert_after(igViews, NULL, logView);
 
 	UIScreen *inGameScreen = malloc(sizeof(UIScreen));

@@ -44,9 +44,7 @@ typedef struct {
     asciiChar firstCharInAtlas;
 } PT_Font;
 
-typedef struct {
-    i32 x; i32 y; i32 w; i32 h;
-} PT_Rect;
+typedef SDL_Rect PT_Rect;
 
 typedef struct {
     u32 *pixels;      // the screen pixels
@@ -70,6 +68,7 @@ internal PT_Console *
 PT_ConsoleInit(i32 width, i32 height, 
                i32 rowCount, i32 colCount);
 
+// TODO: Fix: replace int with i32
 internal void 
 PT_ConsoleSetBitmapFont(PT_Console *con, char *filename, 
                         asciiChar firstCharInAtlas,
