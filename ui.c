@@ -1,15 +1,9 @@
 /*
-    Console Library
+    Hybrid Console/GUI Library
 
     Written by Peter de Tagyos
-    Started: 12/24/2015
+    Started: 1/28/2017
 */
-
-#ifndef PT_CONSOLE
-#define PT_CONSOLE
-
-
-typedef unsigned char asciiChar;
 
 
 // Include the STB image library - only the PNG support
@@ -29,11 +23,14 @@ typedef unsigned char asciiChar;
 
 /* Console Helper Types */
 
+typedef unsigned char asciiChar;
+typedef SDL_Rect UIRect;
+
 typedef struct {
     asciiChar glyph;
     u32 fgColor;
     u32 bgColor;
-} PT_Cell;
+} ConsoleCell;
 
 typedef struct {
     u32 *atlas;
@@ -42,80 +39,128 @@ typedef struct {
     u32 charWidth;
     u32 charHeight;
     asciiChar firstCharInAtlas;
-} PT_Font;
-
-typedef SDL_Rect PT_Rect;
+} ConsoleFont;
 
 typedef struct {
-    u32 *pixels;      // the screen pixels
+    u32 *pixels;      // in-memory representation of the screen pixels
     u32 width;
     u32 height;
     u32 rowCount;
     u32 colCount;
     u32 cellWidth;
     u32 cellHeight;
-    PT_Font *font;
-    PT_Cell *cells;
-} PT_Console;
+    ConsoleFont *font;
+    ConsoleCell *cells;
+} Console;
+
+
+/* UI Types */
+
+typedef void (*UIRenderFunction)(Console *);
+
+typedef struct {
+    List *views;
+} UIScreen;
+
+typedef struct {
+    Console *console;
+    UIRect *pixelRect;
+    UIRenderFunction render;
+} UIView;
+
+
+/* 
+ *************************************************************************
+ ***************************** Interface ********************************* 
+ *************************************************************************
+ */
+
+/* UI Functions */
+
+internal void 
+view_destroy(UIView *view);
+
+internal UIView * 
+view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY, 
+         char *fontFile, asciiChar firstCharInAtlas, 
+         UIRenderFunction renderFn);
+
+internal void 
+view_draw_rect(Console *console, UIRect *rect, u32 color, 
+            i32 borderWidth, u32 borderColor);
 
 
 /* Console Functions */
 
 internal void 
-PT_ConsoleClear(PT_Console *con);
+console_clear(Console *con);
 
-internal PT_Console *
-PT_ConsoleInit(i32 width, i32 height, 
-               i32 rowCount, i32 colCount);
+internal void
+console_destroy(Console *con);
 
-// TODO: Fix: replace int with i32
-internal void 
-PT_ConsoleSetBitmapFont(PT_Console *con, char *filename, 
-                        asciiChar firstCharInAtlas,
-                        int charWidth, int charHeight);
+internal Console *
+console_new(i32 width, i32 height, i32 rowCount, i32 colCount);
 
 internal void 
-PT_ConsolePutCharAt(PT_Console *con, asciiChar c, 
+console_put_char_at(Console *con, asciiChar c, 
                     i32 cellX, i32 cellY,
                     u32 fgColor, u32 bgColor);
 
+internal void 
+console_put_string_at(Console *con, char *string, 
+                      i32 x, i32 y,
+                      u32 fgColor, u32 bgColor);
+
 internal void
-PT_ConsoleDestroy(PT_Console *con);
+console_put_string_in_rect(Console *con, char *string,
+                           UIRect rect, bool wrap, 
+                           u32 fgColor, u32 bgColor);
+
+internal void 
+console_set_bitmap_font(Console *con, char *filename, 
+                        asciiChar firstCharInAtlas,
+                        i32 charWidth, i32 charHeight);
 
 
 /* Utility Functions */
 
 internal inline u32
-PT_ColorizePixel(u32 dest, u32 src); 
+ui_colorize_pixel(u32 dest, u32 src); 
 
 internal void
-PT_CopyBlend(u32 *destPixels, PT_Rect *destRect, u32 destPixelsPerRow,
-             u32 *srcPixels, PT_Rect *srcRect, u32 srcPixelsPerRow,
-             u32 *newColor);
+ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
+           u32 *srcPixels, UIRect *srcRect, u32 srcPixelsPerRow,
+           u32 *newColor);
 
 internal void
-PT_Fill(u32 *pixels, u32 pixelsPerRow, PT_Rect *destRect, u32 color);
+ui_fill(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color);
 
 internal void
-PT_FillBlend(u32 *pixels, u32 pixelsPerRow, PT_Rect *destRect, u32 color);
+ui_fill_blend(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color);
 
-internal PT_Rect 
-PT_RectForGlyph(asciiChar c, PT_Font *font);
+internal UIRect 
+rect_get_for_glyph(asciiChar c, ConsoleFont *font);
 
+
+/* 
+ ******************************************************************************
+ ***************************** Implementation ********************************* 
+ ******************************************************************************
+ */
 
 /* Console Function Implementation */
 
 internal void 
-PT_ConsoleClear(PT_Console *con) {
-    PT_Rect r = {0, 0, con->width, con->height};
-    PT_Fill(con->pixels, con->width, &r, 0x000000ff);
+console_clear(Console *con) {
+    UIRect r = {0, 0, con->width, con->height};
+    ui_fill(con->pixels, con->width, &r, 0x000000ff);
 }
 
-internal PT_Console *
-PT_ConsoleInit(i32 width, i32 height, 
-               i32 rowCount, i32 colCount) {
+internal Console *
+console_new(i32 width, i32 height, 
+            i32 rowCount, i32 colCount) {
     
-    PT_Console *con = malloc(sizeof(PT_Console));
+    Console *con = malloc(sizeof(Console));
 
     con->pixels = calloc(width * height, sizeof(u32));
     con->width = width;
@@ -125,52 +170,51 @@ PT_ConsoleInit(i32 width, i32 height,
     con->cellWidth = width / colCount;
     con->cellHeight = height / rowCount;
     con->font = NULL;
-    con->cells = calloc(rowCount * colCount, sizeof(PT_Cell));
+    con->cells = calloc(rowCount * colCount, sizeof(ConsoleCell));
 
     return con;
 }
 
 internal void
-PT_ConsoleDestroy(PT_Console *con) {
+console_destroy(Console *con) {
     if (con->pixels) { free(con->pixels); }
     if (con->cells) { free(con->cells); }
     if (con) { free(con); }
 }
 
-
 internal void 
-PT_ConsolePutCharAt(PT_Console *con, asciiChar c, 
+console_put_char_at(Console *con, asciiChar c, 
                     i32 cellX, i32 cellY,
                     u32 fgColor, u32 bgColor) {
 
     i32 x = cellX * con->cellWidth;
     i32 y = cellY * con->cellHeight;
-    PT_Rect destRect = {x, y, con->cellWidth, con->cellHeight};
+    UIRect destRect = {x, y, con->cellWidth, con->cellHeight};
 
     // Fill the background with alpha blending
-    PT_FillBlend(con->pixels, con->width, &destRect, bgColor);
+    ui_fill_blend(con->pixels, con->width, &destRect, bgColor);
 
     // Copy the glyph with alpha blending and desired coloring
-    PT_Rect srcRect = PT_RectForGlyph(c, con->font);
-    PT_CopyBlend(con->pixels, &destRect, con->width, 
+    UIRect srcRect = rect_get_for_glyph(c, con->font);
+    ui_copy_blend(con->pixels, &destRect, con->width, 
                  con->font->atlas, &srcRect, con->font->atlasWidth,
                  &fgColor);
 }
 
 internal void 
-PT_ConsolePutStringAt(PT_Console *con, char *string, 
+console_put_string_at(Console *con, char *string, 
                       i32 x, i32 y,
                       u32 fgColor, u32 bgColor) {
     i32 len = strlen(string);
     for (i32 i = 0; i < len; i++) {
-        PT_ConsolePutCharAt(con, (asciiChar)string[i], x+i, y, fgColor, bgColor);
+        console_put_char_at(con, (asciiChar)string[i], x+i, y, fgColor, bgColor);
     }
 }
 
 internal void
-PT_ConsolePutStringInRect(PT_Console *con, char *string,
-                          PT_Rect rect, bool wrap, 
-                          u32 fgColor, u32 bgColor) {
+console_put_string_in_rect(Console *con, char *string,
+                           UIRect rect, bool wrap, 
+                           u32 fgColor, u32 bgColor) {
     u32 len = strlen(string);
     i32 x = rect.x;
     i32 x2 = x + rect.w;
@@ -190,7 +234,7 @@ PT_ConsolePutStringInRect(PT_Console *con, char *string,
             shouldPut = false;
         }
         if (shouldPut) {
-            PT_ConsolePutCharAt(con, (asciiChar)string[i], 
+            console_put_char_at(con, (asciiChar)string[i], 
                                   x, y, fgColor, bgColor);
             x += 1;
         }
@@ -198,9 +242,9 @@ PT_ConsolePutStringInRect(PT_Console *con, char *string,
 }
 
 internal void 
-PT_ConsoleSetBitmapFont(PT_Console *con, char *filename, 
+console_set_bitmap_font(Console *con, char *filename, 
                         asciiChar firstCharInAtlas,
-                        int charWidth, int charHeight) {
+                        i32 charWidth, i32 charHeight) {
 
     // Load the image data
     int imgWidth, imgHeight, numComponents;
@@ -214,7 +258,7 @@ PT_ConsoleSetBitmapFont(PT_Console *con, char *filename,
     memcpy(atlasData, imgData, imgDataSize);
 
     // Create and configure the font
-    PT_Font *font = malloc(sizeof(PT_Font));
+    ConsoleFont *font = malloc(sizeof(ConsoleFont));
     font->atlas = atlasData;
     font->charWidth = charWidth;
     font->charHeight = charHeight;
@@ -232,10 +276,93 @@ PT_ConsoleSetBitmapFont(PT_Console *con, char *filename,
 }
 
 
+/* UI Function Implementation */
+
+internal UIView * 
+view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY, 
+         char *fontFile, asciiChar firstCharInAtlas, 
+         UIRenderFunction renderFn) {
+
+    UIView *view = malloc(sizeof(UIView));
+    UIRect *rect = malloc(sizeof(UIRect));
+
+    memcpy(rect, &pixelRect, sizeof(UIRect));
+    Console *console = console_new(rect->w, rect->h, cellCountY, cellCountX);
+
+    i32 cellWidthPixels = pixelRect.w / cellCountX;
+    i32 cellHeightPixels = pixelRect.h / cellCountY;
+    console_set_bitmap_font(console, fontFile, firstCharInAtlas, cellWidthPixels, cellHeightPixels);
+
+    view->console = console;
+    view->pixelRect = rect;
+    view->render = renderFn;
+
+    return view;
+}
+
+internal void 
+view_destroy(UIView *view) {
+    if (view) {
+        free(view->pixelRect);
+        console_destroy(view->console);
+    }
+}
+
+
+/* UI Utility Functions **/
+
+internal void 
+view_draw_rect(Console *console, UIRect *rect, u32 color, 
+               i32 borderWidth, u32 borderColor)
+{
+    for (i32 y = rect->y; y < rect->y + rect->h; y++) {
+        for (i32 x = rect->x; x < rect->x + rect->w; x++) {
+            char c = ' ';
+            // If we have a border, then go down that rabbit hole
+            if (borderWidth > 0) {               
+                // Sides
+                if ((x == rect->x) || (x == rect->x + rect->w - 1)) {
+                    c = (borderWidth == 1) ? 179 : 186;
+                }
+
+                // Top
+                if (y == rect->y) {
+                    if (x == rect->x) {
+                        // Top left corner
+                        c = (borderWidth == 1) ? 218 : 201;
+                    } else if (x == rect->x + rect->w - 1) {
+                        // Top right corner
+                        c = (borderWidth == 1) ? 191 : 187;
+                    } else {
+                        // Top border
+                        c = (borderWidth == 1) ? 196 : 205;
+                    }
+                }
+                
+                // Bottom
+                if (y == rect->y + rect->h - 1) {
+                    if (x == rect->x) {
+                        // Bottom left corner
+                        c = (borderWidth == 1) ? 192 : 200;
+                    } else if (x == rect->x + rect->w - 1) {
+                        // Bottom right corner
+                        c = (borderWidth == 1) ? 217 : 188;
+                    } else {
+                        // Bottom border
+                        c = (borderWidth == 1) ? 196 : 205;
+                    }
+                }
+            }
+            console_put_char_at(console, c, x, y, borderColor, color);
+        }
+    }
+}
+
+
 /* Utility Function Implementation */
 
 internal inline u32
-PT_ColorizePixel(u32 dest, u32 src) 
+ui_colorize_pixel(u32 dest, u32 src) 
 {
     // Colorize the destination pixel using the source color
     if (ALPHA(dest) == 255) {
@@ -252,9 +379,9 @@ PT_ColorizePixel(u32 dest, u32 src)
 }
 
 internal void
-PT_CopyBlend(u32 *destPixels, PT_Rect *destRect, u32 destPixelsPerRow,
-             u32 *srcPixels, PT_Rect *srcRect, u32 srcPixelsPerRow,
-             u32 *newColor)
+ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
+              u32 *srcPixels, UIRect *srcRect, u32 srcPixelsPerRow,
+              u32 *newColor)
 {
     // If src and dest rects are not the same size ==> bad things
     assert(destRect->w == srcRect->w && destRect->h == srcRect->h);
@@ -278,7 +405,7 @@ PT_CopyBlend(u32 *destPixels, PT_Rect *destRect, u32 destPixelsPerRow,
             u32 destColor = *destPixel;
 
             // Colorize our source pixel before we blend it
-            srcColor = PT_ColorizePixel(srcColor, *newColor);
+            srcColor = ui_colorize_pixel(srcColor, *newColor);
 
             if (ALPHA(srcColor) == 0) {
                 // Source is transparent - so do nothing
@@ -305,7 +432,7 @@ PT_CopyBlend(u32 *destPixels, PT_Rect *destRect, u32 destPixelsPerRow,
 }
 
 internal void
-PT_Fill(u32 *pixels, u32 pixelsPerRow, PT_Rect *destRect, u32 color)
+ui_fill(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color)
 {
     u32 stopX = destRect->x + destRect->w;
     u32 stopY = destRect->y + destRect->h;
@@ -318,7 +445,7 @@ PT_Fill(u32 *pixels, u32 pixelsPerRow, PT_Rect *destRect, u32 color)
 }
 
 internal void
-PT_FillBlend(u32 *pixels, u32 pixelsPerRow, PT_Rect *destRect, u32 color)
+ui_fill_blend(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color)
 {
     // For each pixel in the destination rect, alpha blend the 
     // bgColor to the existing color.
@@ -359,15 +486,25 @@ PT_FillBlend(u32 *pixels, u32 pixelsPerRow, PT_Rect *destRect, u32 color)
     }
 }
 
-internal PT_Rect 
-PT_RectForGlyph(asciiChar c, PT_Font *font) {
+internal UIRect 
+rect_get_for_glyph(asciiChar c, ConsoleFont *font) {
     i32 idx = c - font->firstCharInAtlas;
     i32 charsPerRow = (font->atlasWidth / font->charWidth);
     i32 xOffset = (idx % charsPerRow) * font->charWidth;
     i32 yOffset = (idx / charsPerRow) * font->charHeight;
 
-    PT_Rect glyphRect = {xOffset, yOffset, font->charWidth, font->charHeight};
+    UIRect glyphRect = {xOffset, yOffset, font->charWidth, font->charHeight};
     return glyphRect;
 }
 
-#endif
+
+
+
+
+
+
+
+
+
+
+

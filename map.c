@@ -27,9 +27,9 @@ void map_carve_hallway_horz(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]);
 void map_carve_hallway_vert(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]);
 bool map_carve_room(u32 x, u32 y, u32 w, u32 h, bool (*mapCells)[MAP_HEIGHT]);
 void map_carve_segments(List *hallways, bool (*mapCells)[MAP_HEIGHT]);
-void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount);
-Point rect_random_point(PT_Rect rect);
-i32 room_containing_point(Point pt, PT_Rect *rooms, i32 roomCount);
+void map_get_segments(List *segments, Point from, Point to, UIRect *rooms, u32 roomCount);
+Point rect_random_point(UIRect rect);
+i32 room_containing_point(Point pt, UIRect *rooms, i32 roomCount);
 
 
 /* Map Management */
@@ -45,7 +45,7 @@ void map_generate(bool (*mapCells)[MAP_HEIGHT]) {
 	// Carve out non-overlapping rooms that are randomly placed, and of 
 	// random size. 
 	bool roomsDone = false;
-	PT_Rect rooms[100];
+	UIRect rooms[100];
 	u32 cellsUsed = 0;
 	u32 roomCount = 0;
 	while (!roomsDone) {
@@ -59,7 +59,7 @@ void map_generate(bool (*mapCells)[MAP_HEIGHT]) {
 
 		bool success = map_carve_room(x, y, w, h, mapCells);
 		if (success) {
-			PT_Rect r = {x, y, w, h};
+			UIRect r = {x, y, w, h};
 			rooms[roomCount] = r;
 			roomCount += 1;
 			cellsUsed += (w * h);
@@ -216,7 +216,7 @@ void map_carve_segments(List *hallways, bool (*mapCells)[MAP_HEIGHT]) {
 
 }
 
-void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 roomCount) {
+void map_get_segments(List *segments, Point from, Point to, UIRect *rooms, u32 roomCount) {
 	// Walk between our two points and find all the spans between rooms
 	bool usingWaypoint = false;
 	Point wayPoint = to;
@@ -355,14 +355,14 @@ void map_get_segments(List *segments, Point from, Point to, PT_Rect *rooms, u32 
 	}
 }
 
-Point rect_random_point(PT_Rect rect) {
+Point rect_random_point(UIRect rect) {
 	u32 px = (rand() % (rect.w - 1)) + rect.x;
 	u32 py = (rand() % (rect.h - 1)) + rect.y;
 	Point ret = {px, py};
 	return ret;
 }
 
-i32 room_containing_point(Point pt, PT_Rect *rooms, i32 roomCount) {
+i32 room_containing_point(Point pt, UIRect *rooms, i32 roomCount) {
 	for (i32 i = 0; i < roomCount; i++) {
 		if ((rooms[i].x <= pt.x) && ((rooms[i].x + rooms[i].w) > pt.x) &&
 			(rooms[i].y <= pt.y) && ((rooms[i].y + rooms[i].h) > pt.y)) {

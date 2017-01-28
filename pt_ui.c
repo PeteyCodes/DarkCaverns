@@ -61,7 +61,10 @@ internal UIView * view_new(PT_Rect pixelRect, u32 cellCountX, u32 cellCountY,
 }
 
 internal void view_destroy(UIView *view) {
-    // TODO
+    if (view) {
+        free(view->pixelRect);
+        PT_ConsoleDestroy(view->console);
+    }
 }
 
 /* UI Utility Functions **/
