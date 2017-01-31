@@ -59,14 +59,15 @@ typedef struct {
 typedef void (*UIRenderFunction)(Console *);
 
 typedef struct {
-    List *views;
-} UIScreen;
-
-typedef struct {
     Console *console;
     UIRect *pixelRect;
     UIRenderFunction render;
 } UIView;
+
+typedef struct {
+    List *views;
+    UIView *activeView;
+} UIScreen;
 
 
 /* 

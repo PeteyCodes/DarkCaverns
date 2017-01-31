@@ -43,19 +43,13 @@ typedef int64_t		i64;
 #include "game.c"
 #include "fov.c"
 
-
-// TODO: Move these elsewhere? Add a source file for each screen.
-#define STATS_WIDTH		20
-#define STATS_HEIGHT 	5
-
-#define LOG_WIDTH		58
-#define LOG_HEIGHT		5
+// Screen files
+#include "screen_in_game.c"
 
 
 void render_screen(SDL_Renderer *renderer, 
 				  SDL_Texture *screenTexture, 
 				  UIScreen *screen) {
-
 
 	// Render views from back to front for the current screen
 	ListElement *e = list_head(screen->views);
@@ -70,107 +64,6 @@ void render_screen(SDL_Renderer *renderer,
 	SDL_RenderClear(renderer);
 	SDL_RenderCopy(renderer, screenTexture, NULL, NULL);
 	SDL_RenderPresent(renderer);
-}
-
-internal void gameMapRender(Console *console) {
-
-	// Setup layer render history  
-	u8 layerRendered[MAP_WIDTH][MAP_HEIGHT];
-	for (u32 x = 0; x < MAP_WIDTH; x++) {
-		for (u32 y = 0; y < MAP_HEIGHT; y++) {
-			layerRendered[x][y] = LAYER_UNSET;
-		}
-	}
-
-	ListElement *e = list_head(visibilityComps);
-	while (e != NULL) {
-		Visibility *vis = (Visibility *)list_data(e);
-		Position *p = (Position *)game_object_get_component(&gameObjects[vis->objectId], COMP_POSITION);
-		if (fovMap[p->x][p->y] > 0) {
-			vis->hasBeenSeen = true;
-			// Don't render if we've already written something to to this cell at a higher layer
-			if (p->layer > layerRendered[p->x][p->y]) {
-				console_put_char_at(console, vis->glyph, p->x, p->y, vis->fgColor, vis->bgColor);
-				layerRendered[p->x][p->y] = p->layer;
-			}
-
-		} else if (vis->visibleOutsideFOV && vis->hasBeenSeen) {
-			u32 fullColor = vis->fgColor;
-			u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
-			// Don't render if we've already written something to to this cell at a higher layer
-			if (p->layer > layerRendered[p->x][p->y]) {
-				console_put_char_at(console, vis->glyph, p->x, p->y, fadedColor, 0x000000FF);
-				layerRendered[p->x][p->y] = p->layer;
-			}
-		}
-		e = list_next(e);
-	}
-
-}
-
-internal void statsRender(Console *console) {
-	
-	UIRect rect = {0, 0, STATS_WIDTH, STATS_HEIGHT};
-	view_draw_rect(console, &rect, 0x222222FF, 0, 0xFF990099);
-
-	// HP health bar
-	Health *playerHealth = game_object_get_component(player, COMP_HEALTH);
-	console_put_char_at(console, 'H', 0, 1, 0xFF990099, 0x00000000);
-	console_put_char_at(console, 'P', 1, 1, 0xFF990099, 0x00000000);
-	i32 leftX = 3;
-	i32 barWidth = 16;
-
-	i32 healthCount = ceil(((float)playerHealth->currentHP / (float)playerHealth->maxHP) * barWidth);
-	for (i32 x = 0; x < barWidth; x++) {
-		if (x < healthCount) {
-			console_put_char_at(console, 176, leftX + x, 1, 0x009900FF, 0x00000000);		
-			console_put_char_at(console, 3, leftX + x, 1, 0x009900FF, 0x00000000);		
-		} else {
-			console_put_char_at(console, 176, leftX + x, 1, 0xFF990099, 0x00000000);		
-		}
-	}
-
-	Combat *playerCombat = game_object_get_component(player, COMP_COMBAT);
-	char *att = NULL;
-	sasprintf(att, "ATT: %d (%d)", playerCombat->attack, playerCombat->attackModifier);
-	console_put_string_at(console, att, 0, 2, 0xe6e600FF, 0x00000000);
-	free(att);
-
-	char *def = NULL;
-	sasprintf(def, "DEF: %d (%d)", playerCombat->defense, playerCombat->defenseModifier);
-	console_put_string_at(console, def, 0, 3, 0xe6e600FF, 0x00000000);
-	free(def);
-
-}
-
-internal void messageLogRender(Console *console) {
-
-	UIRect rect = {0, 0, LOG_WIDTH, LOG_HEIGHT};
-	view_draw_rect(console, &rect, 0x191919FF, 0, 0xFF990099);
-
-	if (messageLog == NULL) { return; }
-
-	// Get the last 5 messages from the log
-	ListElement *e = list_tail(messageLog);
-	i32 msgCount = list_size(messageLog);
-	u32 row = 4;
-	u32 col = 0;
-
-	if (msgCount < 5) {
-		row -= (5 - msgCount);
-	} else {
-		msgCount = 5;
-	}
-
-	for (i32 i = 0; i < msgCount; i++) {
-		if (e != NULL) {
-			Message *m = (Message *)list_data(e);
-			UIRect rect = {.x = col, .y = row, .w = LOG_WIDTH, .h = 1};
-			console_put_string_in_rect(console, m->msg, rect, false, m->fgColor, 0x00000000);
-			e = list_prev(e);			
-			row -= 1;
-		}
-	}
 }
 
 int main(int argc, char *argv[]) {
@@ -192,32 +85,12 @@ int main(int argc, char *argv[]) {
 
 	SDL_Texture *screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	// Initialize UI state (screens, view stack, etc)
-	// TODO: Move this somewhere else
-	UIScreen *activeScreen = NULL;
+	// Initialize UI  state (screens, view stack, etc)
+    UIScreen *activeScreen = NULL;
 
-	List *igViews = list_new(NULL);
-
-	UIRect mapRect = {0, 0, (16 * MAP_WIDTH), (16 * MAP_HEIGHT)};
-	UIView *mapView = view_new(mapRect, MAP_WIDTH, MAP_HEIGHT, 
-							   "./terminal16x16.png", 0, gameMapRender);
-	list_insert_after(igViews, NULL, mapView);
-
-	UIRect statsRect = {0, (16 * MAP_HEIGHT), (16 * STATS_WIDTH), (16 * STATS_HEIGHT)};
-	UIView *statsView = view_new(statsRect, STATS_WIDTH, STATS_HEIGHT,
-								 "./terminal16x16.png", 0, statsRender);
-	list_insert_after(igViews, NULL, statsView);
-
-	UIRect logRect = {(16 * 22), (16 * MAP_HEIGHT), (16 * LOG_WIDTH), (16 * LOG_HEIGHT)};
-	UIView *logView = view_new(logRect, LOG_WIDTH, LOG_HEIGHT,
-							   "./terminal16x16.png", 0, messageLogRender);
-	list_insert_after(igViews, NULL, logView);
-
-	UIScreen *inGameScreen = malloc(sizeof(UIScreen));
-	inGameScreen->views = igViews;
-
-	activeScreen = inGameScreen;
-
+	// Show the in-game screen (for now)
+	// TODO: Show the launch screen instead
+	activeScreen = screen_show_in_game();
 
 	// TODO: Move this somewhere else - group with other game startup code
 	world_state_init();
@@ -395,6 +268,11 @@ int main(int argc, char *argv[]) {
 								playerTookTurn = true;		
 							}
 						}	
+					}
+					break;
+
+					case SDLK_i: {
+						show_inventory_overlay(activeScreen);
 					}
 					break;
 
