@@ -25,7 +25,8 @@ internal Shadow knownShadows[10];
 internal u8 shadowCount = 0;
 
 
-void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
+internal void 
+fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 
 	// Reset FOV to default state (hidden)
 	for (u32 x = 0; x < MAP_WIDTH; x++) {

@@ -102,7 +102,7 @@ typedef struct {
 } Message;
 
 
-/* World State */
+/* Game State */
 #define MAX_GO 	10000
 global_variable GameObject *player = NULL;
 global_variable GameObject gameObjects[MAX_GO];
@@ -113,6 +113,11 @@ global_variable List *movementComps;
 global_variable List *healthComps;
 global_variable List *combatComps;
 
+global_variable bool currentlyInGame = false;
+global_variable	bool recalculateFOV = false;
+global_variable	bool playerTookTurn = false;
+
+global_variable	i32 currentLevelNumber;
 global_variable DungeonLevel *currentLevel;
 global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
 global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
@@ -1026,3 +1031,64 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 		combat_deal_damage(attacker, defender);
 	}
 }
+
+
+// Necessary forward-declares
+internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
+
+
+/* High-level Game Routines */
+
+
+internal void
+game_new()
+{
+	// -- Start a brand new game --
+	world_state_init();
+
+	// Create our player
+	player = game_object_create();
+	Visibility vis = {.objectId=player->id, .glyph='@', .fgColor=0x00FF00FF, .bgColor=0x00000000, .hasBeenSeen=true};
+	game_object_update_component(player, COMP_VISIBILITY, &vis);
+	Physical phys = {player->id, true, true};
+	game_object_update_component(player, COMP_PHYSICAL, &phys);
+	Health hlth = {.objectId = player->id, .currentHP = 20, .maxHP = 20, .recoveryRate = 1};
+	game_object_update_component(player, COMP_HEALTH, &hlth);
+	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .hitModifier = 0};
+	game_object_update_component(player, COMP_COMBAT, &com);
+
+	// Create a level and place our player in it
+	currentLevelNumber = 1;
+	currentLevel = level_init(currentLevelNumber, player);
+	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+
+	fov_calculate(playerPos->x, playerPos->y, fovMap);
+
+	generate_target_map(playerPos->x, playerPos->y);
+}
+
+internal void
+game_update() 
+{
+	// Have things move themselves around the dungeon if the player moved
+	if (playerTookTurn) {
+		Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+		generate_target_map(playerPos->x, playerPos->y);
+		movement_update();			
+
+		health_removal_update();
+	}
+
+	// Recalculate the FOV if warranted
+	if (recalculateFOV) {
+		Position *pos = (Position *)game_object_get_component(player, COMP_POSITION);
+		fov_calculate(pos->x, pos->y, fovMap);
+		recalculateFOV = false;
+	}
+
+}
+
+
+
+
+

@@ -47,9 +47,11 @@ typedef int64_t		i64;
 #include "screen_in_game.c"
 
 
-void render_screen(SDL_Renderer *renderer, 
+internal void 
+render_screen(SDL_Renderer *renderer, 
 				  SDL_Texture *screenTexture, 
-				  UIScreen *screen) {
+				  UIScreen *screen) 
+{
 
 	// Render views from back to front for the current screen
 	ListElement *e = list_head(screen->views);
@@ -66,7 +68,8 @@ void render_screen(SDL_Renderer *renderer,
 	SDL_RenderPresent(renderer);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) 
+{
 
 	srand((unsigned)time(NULL));
 
@@ -85,40 +88,20 @@ int main(int argc, char *argv[]) {
 
 	SDL_Texture *screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	// Initialize UI  state (screens, view stack, etc)
+	// Initialize UI state (screens, view stack, etc)
+	// TODO: Move this to ui.c
     UIScreen *activeScreen = NULL;
+
 
 	// Show the in-game screen (for now)
 	// TODO: Show the launch screen instead
 	activeScreen = screen_show_in_game();
 
-	// TODO: Move this somewhere else - group with other game startup code
-	world_state_init();
-
-	// Create our player
-	player = game_object_create();
-	Visibility vis = {.objectId=player->id, .glyph='@', .fgColor=0x00FF00FF, .bgColor=0x00000000, .hasBeenSeen=true};
-	game_object_update_component(player, COMP_VISIBILITY, &vis);
-	Physical phys = {player->id, true, true};
-	game_object_update_component(player, COMP_PHYSICAL, &phys);
-	Health hlth = {.objectId = player->id, .currentHP = 20, .maxHP = 20, .recoveryRate = 1};
-	game_object_update_component(player, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .hitModifier = 0};
-	game_object_update_component(player, COMP_COMBAT, &com);
-
-	// Create a level and place our player in it
-	// TODO: Hand this fn the actual level number we should generate.
-	i32 currentLevelNumber = 1;
-	currentLevel = level_init(currentLevelNumber, player);
-	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
-
-	fov_calculate(playerPos->x, playerPos->y, fovMap);
-
-	generate_target_map(playerPos->x, playerPos->y);
+	// TODO: Move this to somewhere more relevant
+	game_new();
+	currentlyInGame = true;
 
 	bool done = false;
-	bool recalculateFOV = false;
-	bool playerTookTurn = false;
 
 	while (!done) {
 		playerTookTurn = false;
@@ -135,176 +118,30 @@ int main(int argc, char *argv[]) {
 				break;
 			}
 
+			// Handle "global" keypresses (those not handled on a screen-by-screen basis)
 			if (event.type == SDL_KEYDOWN) {
 				SDL_Keycode key = event.key.keysym.sym;
 
-				Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
-
 				switch (key) {
-
-					// DEBUG
-					case SDLK_m:
-						// Restart a new level with a new map
-						level_init(currentLevelNumber, player);
-						playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
-						fov_calculate(playerPos->x, playerPos->y, fovMap);
-						generate_target_map(playerPos->x, playerPos->y);
-
-						break;
-					// END DEBUG
-
 					case SDLK_ESCAPE:
 						done = true;
 						break;
 
-					case SDLK_UP: {
-						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1, LAYER_TOP};
-						if (can_move(newPos)) {
-							game_object_update_component(player, COMP_POSITION, &newPos);
-							recalculateFOV = true;					
-							playerTookTurn = true;		
-
-						} else {
-							// Check to see what is blocking movement. If NPC - resolve combat!
-							List *blockers = game_objects_at_position(playerPos->x, playerPos->y - 1);
-							GameObject *blockerObj = NULL;
-							ListElement *e = list_head(blockers);
-							while (e != NULL) {
-								GameObject *go = (GameObject *)list_data(e);
-								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
-								if (cc != NULL) {
-									blockerObj = go;
-									break;
-								}
-								e = list_next(e);
-							}
-							if (blockerObj != NULL) {
-								combat_attack(player, blockerObj);
-								playerTookTurn = true;		
-							}
-						}	
-					}
-					break;
-
-					case SDLK_DOWN: {
-						Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1, LAYER_TOP};
-						if (can_move(newPos)) {
-							game_object_update_component(player, COMP_POSITION, &newPos);							
-							recalculateFOV = true;							
-							playerTookTurn = true;		
-						} else {
-							// Check to see what is blocking movement. If NPC - resolve combat!
-							List *blockers = game_objects_at_position(playerPos->x, playerPos->y + 1);
-							GameObject *blockerObj = NULL;
-							ListElement *e = list_head(blockers);
-							while (e != NULL) {
-								GameObject *go = (GameObject *)list_data(e);
-								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
-								if (cc != NULL) {
-									blockerObj = go;
-									break;
-								}
-								e = list_next(e);
-							}
-							if (blockerObj != NULL) {
-								combat_attack(player, blockerObj);
-								playerTookTurn = true;		
-							}
-						}	
-					}
-					break;
-
-					case SDLK_LEFT: {
-						Position newPos = {playerPos->objectId, playerPos->x - 1, playerPos->y, LAYER_TOP};
-						if (can_move(newPos)) {
-							game_object_update_component(player, COMP_POSITION, &newPos);							
-							recalculateFOV = true;							
-							playerTookTurn = true;		
-						} else {
-							// Check to see what is blocking movement. If NPC - resolve combat!
-							List *blockers = game_objects_at_position(playerPos->x - 1, playerPos->y);
-							GameObject *blockerObj = NULL;
-							ListElement *e = list_head(blockers);
-							while (e != NULL) {
-								GameObject *go = (GameObject *)list_data(e);
-								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
-								if (cc != NULL) {
-									blockerObj = go;
-									break;
-								}
-								e = list_next(e);
-							}
-							if (blockerObj != NULL) {
-								combat_attack(player, blockerObj);
-								playerTookTurn = true;		
-							}
-						}	
-					}
-					break;
-
-					case SDLK_RIGHT: {
-						Position newPos = {playerPos->objectId, playerPos->x + 1, playerPos->y, LAYER_TOP};
-						if (can_move(newPos)) {
-							game_object_update_component(player, COMP_POSITION, &newPos);							
-							recalculateFOV = true;							
-							playerTookTurn = true;		
-
-						} else {
-							// Check to see what is blocking movement. If NPC - resolve combat!
-							List *blockers = game_objects_at_position(playerPos->x + 1, playerPos->y);
-							GameObject *blockerObj = NULL;
-							ListElement *e = list_head(blockers);
-							while (e != NULL) {
-								GameObject *go = (GameObject *)list_data(e);
-								Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
-								if (cc != NULL) {
-									blockerObj = go;
-									break;
-								}
-								e = list_next(e);
-							}
-							if (blockerObj != NULL) {
-								combat_attack(player, blockerObj);
-								playerTookTurn = true;		
-							}
-						}	
-					}
-					break;
-
-					case SDLK_i: {
-						show_inventory_overlay(activeScreen);
-					}
-					break;
-
-					case SDLK_z: {
-						// Player rests
-						health_recover_player_only();
-						playerTookTurn = true;
-					}
-					break;
-
 					default:
 						break;
 				}
+			
+				// Send the event to the currently active screen for handling
+				activeScreen->handle_event(activeScreen, event);
 			}
 		}
 
-		// Have things move themselves around the dungeon if the player moved
-		if (playerTookTurn) {
-			Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
-			generate_target_map(playerPos->x, playerPos->y);
-			movement_update();			
-
-			health_removal_update();
+		// If we're in-game, have the game update itself
+		if (currentlyInGame) {
+			game_update();		
 		}
 
-		if (recalculateFOV) {
-			Position *pos = (Position *)game_object_get_component(player, COMP_POSITION);
-			fov_calculate(pos->x, pos->y, fovMap);
-			recalculateFOV = false;
-		}
-
-		// TODO: Determine active screen and render it
+		// Render the active screen
 		render_screen(renderer, screenTexture, activeScreen);
 
 		// Limit our FPS

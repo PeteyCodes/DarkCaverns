@@ -55,8 +55,10 @@ typedef struct {
 
 
 /* UI Types */
+struct UIScreen;
 
 typedef void (*UIRenderFunction)(Console *);
+typedef void (*UIEventHandler)(struct UIScreen *, SDL_Event);
 
 typedef struct {
     Console *console;
@@ -67,6 +69,7 @@ typedef struct {
 typedef struct {
     List *views;
     UIView *activeView;
+    UIEventHandler handle_event;
 } UIScreen;
 
 
