@@ -45,6 +45,7 @@ typedef int64_t		i64;
 
 // Screen files
 #include "screen_in_game.c"
+#include "screen_launch.c"
 
 
 internal void 
@@ -90,16 +91,13 @@ int main(int argc, char *argv[])
 
 	// Initialize UI state (screens, view stack, etc)
 	// TODO: Move this to ui.c
+	// TODO: activeScreen should be globally updatable, or have get/set funcctions
     UIScreen *activeScreen = NULL;
 
+	// Show the launch screen instead
+	activeScreen = screen_show_launch();
 
-	// Show the in-game screen (for now)
-	// TODO: Show the launch screen instead
-	activeScreen = screen_show_in_game();
-
-	// TODO: Move this to somewhere more relevant
-	game_new();
-	currentlyInGame = true;
+	currentlyInGame = false;
 
 	bool done = false;
 
