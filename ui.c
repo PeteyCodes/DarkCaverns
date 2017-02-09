@@ -54,6 +54,14 @@ typedef struct {
 } Console;
 
 
+/* Image Types */
+typedef struct {
+    u32 *pixels;
+    u32 width;
+    u32 height;    
+} BitmapImage;
+
+
 /* UI Types */
 struct UIScreen;
 
@@ -73,6 +81,10 @@ typedef struct {
 } UIScreen;
 
 
+/* UI State */
+global_variable UIScreen *activeScreen = NULL;
+
+
 /* 
  *************************************************************************
  ***************************** Interface ********************************* 
@@ -80,6 +92,13 @@ typedef struct {
  */
 
 /* UI Functions */
+
+internal UIScreen *
+ui_get_active_screen();
+
+internal void 
+ui_set_active_screen(UIScreen *screen);
+
 
 internal void 
 view_destroy(UIView *view);
@@ -92,6 +111,9 @@ view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY,
 internal void 
 view_draw_rect(Console *console, UIRect *rect, u32 color, 
             i32 borderWidth, u32 borderColor);
+
+internal void
+view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY);
 
 
 /* Console Functions */
@@ -126,6 +148,12 @@ console_set_bitmap_font(Console *con, char *filename,
                         i32 charWidth, i32 charHeight);
 
 
+/* Image Functions */
+
+internal BitmapImage*
+image_load_from_file(char *filename);
+
+
 /* Utility Functions */
 
 internal inline u32
@@ -151,6 +179,16 @@ rect_get_for_glyph(asciiChar c, ConsoleFont *font);
  ***************************** Implementation ********************************* 
  ******************************************************************************
  */
+
+internal UIScreen *
+ui_get_active_screen() {
+    return activeScreen;
+}
+
+internal void 
+ui_set_active_screen(UIScreen *screen) {
+    activeScreen = screen;
+}
 
 /* Console Function Implementation */
 
@@ -280,6 +318,32 @@ console_set_bitmap_font(Console *con, char *filename,
 }
 
 
+/* Image Functions */
+
+internal BitmapImage*
+image_load_from_file(char *filename) {
+    // Load the image data
+    int imgWidth, imgHeight, numComponents;
+    unsigned char *imgData = stbi_load(filename, 
+                                    &imgWidth, &imgHeight, 
+                                    &numComponents, STBI_rgb_alpha);
+
+    // Copy the image data so we can hold onto it
+    u32 imgDataSize = imgWidth * imgHeight * sizeof(u32);
+    u32 *imageData = malloc(imgDataSize);
+    memcpy(imageData, imgData, imgDataSize);
+
+    BitmapImage *bmi = malloc(sizeof(BitmapImage));
+    bmi->pixels = imageData;
+    bmi->width = imgWidth;
+    bmi->height = imgHeight;
+
+    stbi_image_free(imgData);
+
+    return bmi;
+}
+
+
 /* UI Function Implementation */
 
 internal UIView * 
@@ -359,6 +423,22 @@ view_draw_rect(Console *console, UIRect *rect, u32 color,
             }
             console_put_char_at(console, c, x, y, borderColor, color);
         }
+    }
+}
+
+internal void
+view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY) {
+
+    // Loop through all the pixels in the bitmap, one row at a time and write them into 
+    // the console's pixel buffer at the proper location.
+
+    i32 top = cellY * console->cellHeight;
+    i32 left = cellX * console->cellWidth;
+
+    for (i32 y = 0; y < image->height; y++) {
+        // Copy row of pixels from image to console
+        // memcpy(console->pixels[], image->pixels[], image->width * sizeof(u32));
+        // TODO
     }
 }
 

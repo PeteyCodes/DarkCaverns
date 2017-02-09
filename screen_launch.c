@@ -8,8 +8,8 @@
 #define BG_WIDTH	80
 #define BG_HEIGHT	45
 
-#define MENU_LEFT	30
-#define MENU_TOP	20
+#define MENU_LEFT	50
+#define MENU_TOP	28
 #define MENU_WIDTH	24
 #define MENU_HEIGHT	13
 
@@ -48,13 +48,20 @@ screen_show_launch()
 
 // Render Functions -- 
 
+
 internal void 
 render_bg_view(Console *console) 
 {
-	UIRect rect = {0, 0, BG_WIDTH, BG_HEIGHT};
-	view_draw_rect(console, &rect, 0x222222FF, 1, 0xFF990099);
+	local_persist BitmapImage *bgImage = NULL;
+	if (bgImage == NULL) {
+		bgImage = image_load_from_file("./launch.png");
+	}
 
-	console_put_string_at(console, "Dark Caverns", 10, 10, 0xe600e6FF, 0x00000000);
+	UIRect rect = {0, 0, BG_WIDTH, BG_HEIGHT};
+	view_draw_rect(console, &rect, 0x222222FF, 1, 0x556d76FF);
+	// view_draw_image_at(console, bgImage, 0, 0);
+
+	console_put_string_at(console, "Dark Caverns", 10, 10, 0x556d76FF, 0x00000000);
 	console_put_string_at(console, "TODO: Add a cool ASCII background here!", 10, 16, 0xe6e600FF, 0x00000000);
 }
 
@@ -62,11 +69,11 @@ internal void
 render_menu_view(Console *console) 
 {
 	UIRect rect = {0, 0, MENU_WIDTH, MENU_HEIGHT};
-	view_draw_rect(console, &rect, 0x330033FF, 0, 0xFF990099);
+	view_draw_rect(console, &rect, 0x363247FF, 0, 0xFFFFFFFF);
 
-	console_put_string_at(console, "Start a (n)ew game", 2, 3, 0xe6e600FF, 0x00000000);
-	console_put_string_at(console, "(L)oad a saved game", 2, 6, 0xe6e600FF, 0x00000000);
-	console_put_string_at(console, "Show (C)redits", 2, 9, 0xe6e600FF, 0x00000000);
+	console_put_string_at(console, "Start a (N)ew game", 2, 3, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "(L)oad a saved game", 2, 6, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "Show (C)redits", 2, 9, 0xbca285FF, 0x00000000);
 }
 
 
@@ -83,7 +90,7 @@ handle_event_launch(UIScreen *activeScreen, SDL_Event event)
 			case SDLK_n: {
 				// Start a new game and transition to in-game screen
 				game_new();
-				activeScreen = screen_show_in_game();
+				ui_set_active_screen(screen_show_in_game());
 				currentlyInGame = true;
 			}
 			break;

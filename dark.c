@@ -89,13 +89,8 @@ int main(int argc, char *argv[])
 
 	SDL_Texture *screenTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-	// Initialize UI state (screens, view stack, etc)
-	// TODO: Move this to ui.c
-	// TODO: activeScreen should be globally updatable, or have get/set funcctions
-    UIScreen *activeScreen = NULL;
-
-	// Show the launch screen instead
-	activeScreen = screen_show_launch();
+	// Initialize UI state to show launch screen
+	ui_set_active_screen(screen_show_launch());
 
 	currentlyInGame = false;
 
@@ -130,7 +125,8 @@ int main(int argc, char *argv[])
 				}
 			
 				// Send the event to the currently active screen for handling
-				activeScreen->handle_event(activeScreen, event);
+				UIScreen *screenForInput = ui_get_active_screen(); 
+				screenForInput->handle_event(screenForInput, event);
 			}
 		}
 
@@ -140,7 +136,7 @@ int main(int argc, char *argv[])
 		}
 
 		// Render the active screen
-		render_screen(renderer, screenTexture, activeScreen);
+		render_screen(renderer, screenTexture, ui_get_active_screen());
 
 		// Limit our FPS
 		i32 sleepTime = timePerFrame - (SDL_GetTicks() - frameStart);
