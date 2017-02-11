@@ -20,6 +20,8 @@
 
 #define COLOR_FROM_RGBA(r, g, b, a) ((r << 24) | (g << 16) | (b << 8) | a)
 
+#define SWAP_U32(x) (((x) >> 24) | (((x) & 0x00ff0000) >> 8) | (((x) & 0x0000ff00) << 8) | ((x) << 24))
+
 
 /* Console Helper Types */
 
@@ -64,6 +66,7 @@ typedef struct {
 
 /* UI Types */
 struct UIScreen;
+typedef struct UIScreen UIScreen;
 
 typedef void (*UIRenderFunction)(Console *);
 typedef void (*UIEventHandler)(struct UIScreen *, SDL_Event);
@@ -74,11 +77,11 @@ typedef struct {
     UIRenderFunction render;
 } UIView;
 
-typedef struct {
+struct UIScreen {
     List *views;
     UIView *activeView;
     UIEventHandler handle_event;
-} UIScreen;
+};
 
 
 /* UI State */
@@ -333,6 +336,15 @@ image_load_from_file(char *filename) {
     u32 *imageData = malloc(imgDataSize);
     memcpy(imageData, imgData, imgDataSize);
 
+    // Swap endianness of data if we need to
+    if (system_is_little_endian()) {
+        u32 pixelCount = imgWidth * imgHeight;
+        for (u32 i = 0; i < pixelCount; i++) {
+            imageData[i] = SWAP_U32(imageData[i]);
+        }        
+    }
+
+
     BitmapImage *bmi = malloc(sizeof(BitmapImage));
     bmi->pixels = imageData;
     bmi->width = imgWidth;
@@ -428,17 +440,13 @@ view_draw_rect(Console *console, UIRect *rect, u32 color,
 
 internal void
 view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY) {
-
     // Loop through all the pixels in the bitmap, one row at a time and write them into 
     // the console's pixel buffer at the proper location.
-
-    i32 top = cellY * console->cellHeight;
-    i32 left = cellX * console->cellWidth;
-
-    for (i32 y = 0; y < image->height; y++) {
+    u32 dstX = cellX * console->cellWidth;
+    for (u32 srcY = 0; srcY < image->height; srcY++) {
         // Copy row of pixels from image to console
-        // memcpy(console->pixels[], image->pixels[], image->width * sizeof(u32));
-        // TODO
+        u32 dstY = (cellY * console->cellHeight) + srcY;
+        memcpy(&console->pixels[(dstY * console->width) + dstX], &image->pixels[srcY * image->width], image->width * sizeof(u32));
     }
 }
 

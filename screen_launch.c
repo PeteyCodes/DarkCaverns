@@ -58,11 +58,10 @@ render_bg_view(Console *console)
 	}
 
 	UIRect rect = {0, 0, BG_WIDTH, BG_HEIGHT};
-	view_draw_rect(console, &rect, 0x222222FF, 1, 0x556d76FF);
-	// view_draw_image_at(console, bgImage, 0, 0);
+	view_draw_rect(console, &rect, 0x00000000, 1, 0x556d76FF);
+	view_draw_image_at(console, bgImage, 0, 0);
 
-	console_put_string_at(console, "Dark Caverns", 10, 10, 0x556d76FF, 0x00000000);
-	console_put_string_at(console, "TODO: Add a cool ASCII background here!", 10, 16, 0xe6e600FF, 0x00000000);
+	console_put_string_at(console, "Dark Caverns", 52, 18, 0x556d76FF, 0x00000000);
 }
 
 internal void 

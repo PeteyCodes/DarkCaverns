@@ -3,6 +3,16 @@
  */
 
 
+/* Determine the endianness of the system we're running on. */
+bool system_is_little_endian() {
+    unsigned int x = 0x76543210;
+    char *c = (char*) &x; 
+    if (*c == 0x10) { return true; }
+    return false;
+}
+
+
+
 /* Convert a character string representing a hex value to an int */
 int xtoi(char *hexstring) {
 	int	i = 0;
