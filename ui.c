@@ -63,6 +63,12 @@ typedef struct {
     u32 height;    
 } BitmapImage;
 
+typedef struct {
+    ConsoleCell *cells;
+    u32 width;
+    u32 height;
+} AsciiImage;
+
 
 /* UI Types */
 struct UIScreen;
@@ -152,6 +158,9 @@ console_set_bitmap_font(Console *con, char *filename,
 
 
 /* Image Functions */
+
+internal AsciiImage*
+asciify_bitmap(BitmapImage *);
 
 internal BitmapImage*
 image_load_from_file(char *filename);
@@ -322,6 +331,22 @@ console_set_bitmap_font(Console *con, char *filename,
 
 
 /* Image Functions */
+
+internal AsciiImage*
+asciify_bitmap(BitmapImage *) {
+    // TODO: Break the given bitmap image into cells
+    // TODO: Loop through all cells
+        // TODO: Analyze each cell to determine primary & secondary colors
+        // TODO: Create a binary representation of the graphic indicating the "shape" of the cell
+        // TODO: Determine the best fit glyph for the cell shape
+        // TODO: Render that glyph into a cell of the ascii image 
+}
+
+internal void 
+image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor) {
+
+}
+
 
 internal BitmapImage*
 image_load_from_file(char *filename) {
