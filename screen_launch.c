@@ -52,9 +52,12 @@ screen_show_launch()
 internal void 
 render_bg_view(Console *console) 
 {
+	// We should load and process the bg image only once, not on each render
 	local_persist BitmapImage *bgImage = NULL;
+	local_persist AsciiImage *aiImage = NULL;
 	if (bgImage == NULL) {
 		bgImage = image_load_from_file("./launch.png");
+		aiImage = asciify_bitmap(console, bgImage);	
 	}
 
 	UIRect rect = {0, 0, BG_WIDTH, BG_HEIGHT};

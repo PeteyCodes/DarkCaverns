@@ -41,6 +41,10 @@ typedef struct {
     u32 charWidth;
     u32 charHeight;
     asciiChar firstCharInAtlas;
+
+    // TODO: Consider chopping the atlas into BitmapImages for each cell
+    // TODO: This will optimize the ASCIIfy routine, and may even help with rendering?
+
 } ConsoleFont;
 
 typedef struct {
@@ -65,8 +69,8 @@ typedef struct {
 
 typedef struct {
     ConsoleCell *cells;
-    u32 width;
-    u32 height;
+    u32 rows;
+    u32 cols;
 } AsciiImage;
 
 
@@ -160,10 +164,22 @@ console_set_bitmap_font(Console *con, char *filename,
 /* Image Functions */
 
 internal AsciiImage*
-asciify_bitmap(BitmapImage *);
+asciify_bitmap(Console *con, BitmapImage *image);
 
 internal BitmapImage*
 image_load_from_file(char *filename);
+
+internal BitmapImage *
+image_slice(BitmapImage *img, i32 rows, i32 cols);
+
+internal void 
+image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor);
+
+internal BitmapImage *
+image_mask_create(BitmapImage *, u32 primaryColor, u32 secondaryColor);
+
+internal asciiChar
+image_match_glyph(Console *console, BitmapImage *maskImage);
 
 
 /* Utility Functions */
@@ -333,20 +349,174 @@ console_set_bitmap_font(Console *con, char *filename,
 /* Image Functions */
 
 internal AsciiImage*
-asciify_bitmap(BitmapImage *) {
-    // TODO: Break the given bitmap image into cells
-    // TODO: Loop through all cells
-        // TODO: Analyze each cell to determine primary & secondary colors
-        // TODO: Create a binary representation of the graphic indicating the "shape" of the cell
-        // TODO: Determine the best fit glyph for the cell shape
-        // TODO: Render that glyph into a cell of the ascii image 
+asciify_bitmap(Console *con, BitmapImage *image) {
+    assert(image->height % con->cellHeight == 0);
+    assert(image->width % con->cellWidth == 0);
+
+    i32 rows = image->height / con->cellHeight;
+    i32 cols = image->width / con->cellWidth;
+
+    AsciiImage *asciiImg = malloc(sizeof(AsciiImage));
+    asciiImg->cells = malloc(rows * cols * sizeof(ConsoleCell));
+    asciiImg->rows = rows;
+    asciiImg->cols = cols;
+
+    // Break the given bitmap image into cells
+    BitmapImage *cells = image_slice(image, rows, cols);
+
+    // Loop through all cells
+    // for (i32 r = 0; r < rows; r++) {
+    //     for (i32 c = 0; c < cols; c++) {
+    for (i32 r = 0; r < 1; r++) {
+        for (i32 c = 0; c < 1; c++) {
+            // Analyze each cell to determine primary & secondary colors
+            u32 primaryColor = 0;
+            u32 secondaryColor = 0;
+
+            BitmapImage *cellImage = &cells[r * cols + c];
+            image_analyze_colors(&cells[r * cols + c], &primaryColor, &secondaryColor);
+
+// printf("P: r:%d g:%d b:%d\n", RED(primaryColor), GREEN(primaryColor), BLUE(primaryColor));
+// printf("S: r:%d g:%d b:%d\n", RED(secondaryColor), GREEN(secondaryColor), BLUE(secondaryColor));
+
+            // Create a "1-bit" representation of the graphic indicating the "shape" of the cell
+            BitmapImage *maskImage = image_mask_create(cellImage, primaryColor, secondaryColor);
+
+            // Determine the best fit glyph for the cell shape
+            asciiChar glyph = image_match_glyph(con, maskImage);
+
+            // We're done with the mask
+            free(maskImage);
+
+            printf("Best glyph: %d\n", glyph);
+
+            // Render that glyph into a cell of the ascii image
+            ConsoleCell *cCell = &asciiImg->cells[r * cols + c];
+            if (glyph == ' ') {
+                // Single color cell
+                cCell->fgColor = secondaryColor;
+                cCell->bgColor = primaryColor;
+            } else {
+                cCell->fgColor = primaryColor;
+                cCell->bgColor = secondaryColor;
+            }
+
+        }
+    }
+
+    // Free the memory in each cell's pixels
+    for (i32 c = 0; c < (rows * cols); c++) {
+        BitmapImage *bm = &cells[c];
+        free(bm->pixels);
+    }
+    free(cells);
+    return asciiImg;
+}
+
+internal BitmapImage *
+image_slice(BitmapImage *img, i32 rows, i32 cols) {
+    // Slice the given image into a 2D array of image cells
+    i32 cellWidth = img->width / cols;
+    i32 cellHeight = img->height / rows;
+    BitmapImage *cells = malloc(rows * cols * sizeof(BitmapImage));
+    for (i32 cellY = 0; cellY < rows; cellY++) {
+        for (i32 cellX = 0; cellX < cols; cellX++) {
+            BitmapImage *cellBM = &cells[(cellY * rows) + cellX];
+            cellBM->width = cellWidth;
+            cellBM->height = cellHeight;
+            cellBM->pixels = malloc(cellWidth * cellHeight * sizeof(u32));
+
+            for (i32 y = 0; y < cellHeight; y++) {
+                memcpy(&cellBM->pixels[y * cellWidth], 
+                    &img->pixels[(((cellY * cellHeight) + y) * img->width) + (cellX * cellWidth)], 
+                    cellWidth * sizeof(u32));
+            }
+        }
+    }
+    return cells;
+}
+
+internal i32
+rgbdist(u32 color1, u32 color2) {
+    i32 dr = RED(color1) - RED(color2);
+    i32 dg = GREEN(color1) - GREEN(color2);
+    i32 db = BLUE(color1) - BLUE(color2);
+
+    return dr*dr + dg*dg + db*db;    
+}
+
+internal bool
+colors_are_distinct(u32 color1, u32 color2) {
+    if (rgbdist(color1, color2) > 10000) {
+        return true;
+    }
+    return false;
 }
 
 internal void 
 image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor) {
+    // Determine primary and secondary colors for the given image.
+    // The colors should be distinct enough to be distiguishable.
 
+    // Step one - count color occurrences
+    u32 colors[image->width * image->height];
+    i32 counts[image->width * image->height];
+    u32 numColors = 0;
+
+    for (u32 y = 0; y < image->height; y++) {
+        for (u32 x = 0; x < image->width; x++) {
+            // Grab the pixel color
+            u32 pixelColor = image->pixels[(y * image->width) + x];
+
+            bool alreadySeen = false;
+            for (u32 i = 0; i < numColors; i++) {
+                if (colors[i] == pixelColor) {
+                    alreadySeen = true;
+                    counts[i] += 1;
+                    break;
+                }
+            }
+
+            if (!alreadySeen) {
+                colors[numColors] = pixelColor;
+                counts[numColors] = 1;
+                numColors += 1;
+            }
+        }
+    }
+
+    // Step two - distill this list into distinct primary/secondary colors
+    // Primary
+    i32 pIdx = -1;
+    i32 pCount = -1;
+    for (u32 i = 0; i < numColors; i++) {
+        if (counts[i] > pCount) {
+            pIdx = i;
+            pCount = counts[i];
+        }
+    }
+
+    *primaryColor = colors[pIdx];
+
+    // Secondary
+    i32 sIdx = -1;
+    i32 sCount = -1;
+    for (u32 i = 0; i < numColors; i++) {
+        if ((colors[i] != *primaryColor) && 
+            (counts[i] > sCount) && 
+            (colors_are_distinct(*primaryColor, colors[i]))) {
+            sIdx = i;
+            sCount = counts[i];
+        }
+    }
+
+    if (sIdx != -1) {
+        *secondaryColor = colors[sIdx];
+    } else {
+        // We only have one color
+        secondaryColor = 0x00000000;
+    }
 }
-
 
 internal BitmapImage*
 image_load_from_file(char *filename) {
@@ -378,6 +548,64 @@ image_load_from_file(char *filename) {
     stbi_image_free(imgData);
 
     return bmi;
+}
+
+internal BitmapImage *
+image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor) {
+    // Create a "1-bit" version of the given image
+    BitmapImage *maskImage = malloc(sizeof(BitmapImage));
+    maskImage->width = origImage->width;
+    maskImage->height = origImage->height;
+    maskImage->pixels = malloc(origImage->width * origImage->height * sizeof(u32));
+
+    for (u32 y = 0; y < origImage->height; y++) {
+        for (u32 x = 0; x < origImage->width; x++) {
+            u32 pixelColor = origImage->pixels[y * origImage->width + x];
+            if (rgbdist(pixelColor, primaryColor) <= rgbdist(pixelColor, secondaryColor)) {
+                maskImage->pixels[y * origImage->width + x] = 0xFFFFFFFF;
+            } else {
+                maskImage->pixels[y * origImage->width + x] = 0x000000FF;
+            }
+        }
+    }
+
+    return  maskImage;
+}
+
+internal asciiChar
+image_match_glyph(Console *console, BitmapImage *maskImage) {
+    ConsoleFont *font = console->font;
+    u32 fontCols = font->atlasWidth / font->charWidth;
+    u32 fontRows = font->atlasHeight / font->charHeight;
+
+    u32 matchCount = 0;
+    u32 matchIndex = 0;
+
+    // Loop through all glyphs in the font, looking for the best match to the mask image
+    for (u32 cellY = 0; cellY < fontRows; cellY++) {
+        for (u32 cellX = 0; cellX < fontCols; cellX++) {
+            // Compare all the pixels in the glyph to all the pixels in the mask
+            u32 matches = 0;
+            for (u32 y = 0; y < font->charHeight; y++) {
+                for (u32 x = 0; x < font->charWidth; x++) {
+                    u32 glyphPixel = font->atlas[((cellY * font->charHeight + y) * font->atlasWidth) + (cellX * font->charWidth) + x];
+                    u32 maskPixel = maskImage->pixels[y * font->charHeight + x];
+
+                    printf("gp: %d %d %d %d\n", RED(glyphPixel), GREEN(glyphPixel), BLUE(glyphPixel), ALPHA(glyphPixel));
+                    printf("mp: %d %d %d %d\n", RED(maskPixel), GREEN(maskPixel), BLUE(maskPixel), ALPHA(maskPixel));
+
+                    if (glyphPixel == maskPixel) { matches += 1; }
+                }
+            }
+
+            if (matches > matchCount) {
+                matchCount = matches;
+                matchIndex = cellY * fontCols + cellX;
+            }
+        }
+    }
+
+    return matchIndex;
 }
 
 
