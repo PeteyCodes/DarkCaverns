@@ -327,6 +327,21 @@ console_set_bitmap_font(Console *con, char *filename,
     u32 *atlasData = malloc(imgDataSize);
     memcpy(atlasData, imgData, imgDataSize);
 
+    // Swap endianness of data if we need to
+    u32 pixelCount = imgWidth * imgHeight;
+    if (system_is_little_endian()) {
+        for (u32 i = 0; i < pixelCount; i++) {
+            atlasData[i] = SWAP_U32(atlasData[i]);
+        }        
+    }
+
+    // Turn all black pixels into transparent pixels
+    for (u32 i = 0; i < pixelCount; i++) {
+        if (atlasData[i] == 0x000000ff) { 
+            atlasData[i] = 0x00000000; 
+        }
+    }        
+
     // Create and configure the font
     ConsoleFont *font = malloc(sizeof(ConsoleFont));
     font->atlas = atlasData;
@@ -405,10 +420,11 @@ asciify_bitmap(Console *con, BitmapImage *image) {
     }
 
     // Free the memory in each cell's pixels
-    for (i32 c = 0; c < (rows * cols); c++) {
-        BitmapImage *bm = &cells[c];
-        free(bm->pixels);
-    }
+	// TODO: - DEBUG
+    // for (i32 c = 0; c < (rows * cols); c++) {
+    //     BitmapImage *bm = &cells[c];
+    //     free(bm->pixels);
+    // }
     free(cells);
     return asciiImg;
 }
@@ -459,8 +475,8 @@ image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor)
     // The colors should be distinct enough to be distiguishable.
 
     // Step one - count color occurrences
-    u32 colors[image->width * image->height];
-    i32 counts[image->width * image->height];
+    u32 *colors = malloc(image->width * image->height * sizeof(u32));
+    u32 *counts = malloc(image->width * image->height * sizeof(u32));
     u32 numColors = 0;
 
     for (u32 y = 0; y < image->height; y++) {
@@ -516,6 +532,9 @@ image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor)
         // We only have one color
         secondaryColor = 0x00000000;
     }
+
+    free(colors);
+    free(counts);
 }
 
 internal BitmapImage*
@@ -538,7 +557,6 @@ image_load_from_file(char *filename) {
             imageData[i] = SWAP_U32(imageData[i]);
         }        
     }
-
 
     BitmapImage *bmi = malloc(sizeof(BitmapImage));
     bmi->pixels = imageData;
@@ -564,12 +582,12 @@ image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor) 
             if (rgbdist(pixelColor, primaryColor) <= rgbdist(pixelColor, secondaryColor)) {
                 maskImage->pixels[y * origImage->width + x] = 0xFFFFFFFF;
             } else {
-                maskImage->pixels[y * origImage->width + x] = 0x000000FF;
+                maskImage->pixels[y * origImage->width + x] = 0x00000000;
             }
         }
     }
 
-    return  maskImage;
+    return maskImage;
 }
 
 internal asciiChar
@@ -591,8 +609,10 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
                     u32 glyphPixel = font->atlas[((cellY * font->charHeight + y) * font->atlasWidth) + (cellX * font->charWidth) + x];
                     u32 maskPixel = maskImage->pixels[y * font->charHeight + x];
 
-                    printf("gp: %d %d %d %d\n", RED(glyphPixel), GREEN(glyphPixel), BLUE(glyphPixel), ALPHA(glyphPixel));
-                    printf("mp: %d %d %d %d\n", RED(maskPixel), GREEN(maskPixel), BLUE(maskPixel), ALPHA(maskPixel));
+                    // printf("gp: %d\n", glyphPixel);
+                    // printf("mp: %d\n", maskPixel);
+                    // printf("gp: %d %d %d %d\n", RED(glyphPixel), GREEN(glyphPixel), BLUE(glyphPixel), ALPHA(glyphPixel));
+                    // printf("mp: %d %d %d %d\n", RED(maskPixel), GREEN(maskPixel), BLUE(maskPixel), ALPHA(maskPixel));
 
                     if (glyphPixel == maskPixel) { matches += 1; }
                 }
@@ -605,6 +625,7 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
         }
     }
 
+    printf("Matches: %d\n", matchCount);
     return matchIndex;
 }
 
