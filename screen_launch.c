@@ -48,7 +48,6 @@ screen_show_launch()
 
 // Render Functions -- 
 
-
 internal void 
 render_bg_view(Console *console) 
 {
@@ -60,9 +59,11 @@ render_bg_view(Console *console)
 		aiImage = asciify_bitmap(console, bgImage);	
 	}
 
-	UIRect rect = {0, 0, BG_WIDTH, BG_HEIGHT};
-	view_draw_rect(console, &rect, 0x00000000, 1, 0x556d76FF);
-	view_draw_image_at(console, bgImage, 0, 0);
+	if (asciiMode) {
+		view_draw_ascii_image_at(console, aiImage, 0, 0);
+	} else {
+		view_draw_image_at(console, bgImage, 0, 0);	
+	}
 
 	console_put_string_at(console, "Dark Caverns", 52, 18, 0x556d76FF, 0x00000000);
 }
@@ -98,6 +99,7 @@ handle_event_launch(UIScreen *activeScreen, SDL_Event event)
 			break;
 
 			case SDLK_DOWN: {
+
 			}
 			break;
 

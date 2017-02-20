@@ -120,6 +120,11 @@ int main(int argc, char *argv[])
 						done = true;
 						break;
 
+					case SDLK_g: {
+						asciiMode = !asciiMode;
+					}
+					break;
+
 					default:
 						break;
 				}

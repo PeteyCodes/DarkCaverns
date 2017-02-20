@@ -96,6 +96,7 @@ struct UIScreen {
 
 /* UI State */
 global_variable UIScreen *activeScreen = NULL;
+global_variable bool asciiMode = true;
 
 
 /* 
@@ -127,6 +128,9 @@ view_draw_rect(Console *console, UIRect *rect, u32 color,
 
 internal void
 view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY);
+
+internal void
+view_draw_ascii_image_at(Console *console, AsciiImage *image, i32 cellX, i32 cellY);
 
 
 /* Console Functions */
@@ -176,7 +180,7 @@ internal void
 image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor);
 
 internal BitmapImage *
-image_mask_create(BitmapImage *, u32 primaryColor, u32 secondaryColor);
+image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor);
 
 internal asciiChar
 image_match_glyph(Console *console, BitmapImage *maskImage);
@@ -380,22 +384,30 @@ asciify_bitmap(Console *con, BitmapImage *image) {
     BitmapImage *cells = image_slice(image, rows, cols);
 
     // Loop through all cells
-    // for (i32 r = 0; r < rows; r++) {
-    //     for (i32 c = 0; c < cols; c++) {
-    for (i32 r = 0; r < 1; r++) {
-        for (i32 c = 0; c < 1; c++) {
+    for (i32 r = 0; r < rows; r++) {
+        for (i32 c = 0; c < cols; c++) {
             // Analyze each cell to determine primary & secondary colors
             u32 primaryColor = 0;
             u32 secondaryColor = 0;
 
             BitmapImage *cellImage = &cells[r * cols + c];
-            image_analyze_colors(&cells[r * cols + c], &primaryColor, &secondaryColor);
-
-// printf("P: r:%d g:%d b:%d\n", RED(primaryColor), GREEN(primaryColor), BLUE(primaryColor));
-// printf("S: r:%d g:%d b:%d\n", RED(secondaryColor), GREEN(secondaryColor), BLUE(secondaryColor));
+            image_analyze_colors(cellImage, &primaryColor, &secondaryColor);
 
             // Create a "1-bit" representation of the graphic indicating the "shape" of the cell
             BitmapImage *maskImage = image_mask_create(cellImage, primaryColor, secondaryColor);
+
+// DEBUG
+            // for (u32 y = 0; y < 16; y++) {
+            //     for (u32 x = 0; x < 16; x++) {
+            //         if (maskImage->pixels[y * 16 + x] == 0xffffffff) {
+            //             printf("1");
+            //         } else {
+            //             printf("0");
+            //         }
+            //     }
+            //     printf("\n");
+            // }
+// DEBUG
 
             // Determine the best fit glyph for the cell shape
             asciiChar glyph = image_match_glyph(con, maskImage);
@@ -403,10 +415,11 @@ asciify_bitmap(Console *con, BitmapImage *image) {
             // We're done with the mask
             free(maskImage);
 
-            printf("Best glyph: %d\n", glyph);
+            // printf("Best glyph: %c\n", glyph);
 
             // Render that glyph into a cell of the ascii image
             ConsoleCell *cCell = &asciiImg->cells[r * cols + c];
+            cCell->glyph = glyph;
             if (glyph == ' ') {
                 // Single color cell
                 cCell->fgColor = secondaryColor;
@@ -437,7 +450,7 @@ image_slice(BitmapImage *img, i32 rows, i32 cols) {
     BitmapImage *cells = malloc(rows * cols * sizeof(BitmapImage));
     for (i32 cellY = 0; cellY < rows; cellY++) {
         for (i32 cellX = 0; cellX < cols; cellX++) {
-            BitmapImage *cellBM = &cells[(cellY * rows) + cellX];
+            BitmapImage *cellBM = &cells[(cellY * cols) + cellX];
             cellBM->width = cellWidth;
             cellBM->height = cellHeight;
             cellBM->pixels = malloc(cellWidth * cellHeight * sizeof(u32));
@@ -452,7 +465,7 @@ image_slice(BitmapImage *img, i32 rows, i32 cols) {
     return cells;
 }
 
-internal i32
+internal u32
 rgbdist(u32 color1, u32 color2) {
     i32 dr = RED(color1) - RED(color2);
     i32 dg = GREEN(color1) - GREEN(color2);
@@ -463,7 +476,7 @@ rgbdist(u32 color1, u32 color2) {
 
 internal bool
 colors_are_distinct(u32 color1, u32 color2) {
-    if (rgbdist(color1, color2) > 10000) {
+    if (rgbdist(color1, color2) > 5000) {
         return true;
     }
     return false;
@@ -504,7 +517,7 @@ image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor)
     // Step two - distill this list into distinct primary/secondary colors
     // Primary
     i32 pIdx = -1;
-    i32 pCount = -1;
+    u32 pCount = 0;
     for (u32 i = 0; i < numColors; i++) {
         if (counts[i] > pCount) {
             pIdx = i;
@@ -516,7 +529,7 @@ image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor)
 
     // Secondary
     i32 sIdx = -1;
-    i32 sCount = -1;
+    u32 sCount = 0;
     for (u32 i = 0; i < numColors; i++) {
         if ((colors[i] != *primaryColor) && 
             (counts[i] > sCount) && 
@@ -569,7 +582,8 @@ image_load_from_file(char *filename) {
 }
 
 internal BitmapImage *
-image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor) {
+image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor) 
+{
     // Create a "1-bit" version of the given image
     BitmapImage *maskImage = malloc(sizeof(BitmapImage));
     maskImage->width = origImage->width;
@@ -599,33 +613,31 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
     u32 matchCount = 0;
     u32 matchIndex = 0;
 
+    asciiChar drawingGlyphs[] = {219, 220, 221, 222, 223, 226, 227, 228, 229, 230, 231, 0};
+    u32 drawingGlyphCount = 12;
+
     // Loop through all glyphs in the font, looking for the best match to the mask image
-    for (u32 cellY = 0; cellY < fontRows; cellY++) {
-        for (u32 cellX = 0; cellX < fontCols; cellX++) {
-            // Compare all the pixels in the glyph to all the pixels in the mask
-            u32 matches = 0;
-            for (u32 y = 0; y < font->charHeight; y++) {
-                for (u32 x = 0; x < font->charWidth; x++) {
-                    u32 glyphPixel = font->atlas[((cellY * font->charHeight + y) * font->atlasWidth) + (cellX * font->charWidth) + x];
-                    u32 maskPixel = maskImage->pixels[y * font->charHeight + x];
+    for (u32 dgi = 0; dgi < drawingGlyphCount; dgi++) {
+        u32 cellY = drawingGlyphs[dgi] / 16;
+        u32 cellX = drawingGlyphs[dgi] % 16;
 
-                    // printf("gp: %d\n", glyphPixel);
-                    // printf("mp: %d\n", maskPixel);
-                    // printf("gp: %d %d %d %d\n", RED(glyphPixel), GREEN(glyphPixel), BLUE(glyphPixel), ALPHA(glyphPixel));
-                    // printf("mp: %d %d %d %d\n", RED(maskPixel), GREEN(maskPixel), BLUE(maskPixel), ALPHA(maskPixel));
+        // Compare all the pixels in the glyph to all the pixels in the mask
+        u32 matches = 0; 
+        for (u32 y = 0; y < font->charHeight; y++) {
+            for (u32 x = 0; x < font->charWidth; x++) {
+                u32 glyphPixel = font->atlas[((cellY * font->charHeight + y) * font->atlasWidth) + (cellX * font->charWidth) + x];
+                u32 maskPixel = maskImage->pixels[y * font->charHeight + x];
 
-                    if (glyphPixel == maskPixel) { matches += 1; }
-                }
+                if (glyphPixel == maskPixel) { matches += 1; }
             }
+        }
 
-            if (matches > matchCount) {
-                matchCount = matches;
-                matchIndex = cellY * fontCols + cellX;
-            }
+        if (matches > matchCount) {
+            matchCount = matches;
+            matchIndex = cellY * fontCols + cellX;
         }
     }
 
-    printf("Matches: %d\n", matchCount);
     return matchIndex;
 }
 
@@ -724,6 +736,16 @@ view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY) {
     }
 }
 
+internal void
+view_draw_ascii_image_at(Console *console, AsciiImage *image, i32 cellX, i32 cellY)
+{
+    for (u32 y = 0; y < image->rows; y++) {
+        for (u32 x = 0; x < image->cols; x++) {
+            ConsoleCell cc = image->cells[y * image->cols + x];
+            console_put_char_at(console, cc.glyph, x, y, cc.fgColor, cc.bgColor);
+        }
+    }
+}
 
 /* Utility Function Implementation */
 
