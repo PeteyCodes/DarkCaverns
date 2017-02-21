@@ -96,7 +96,7 @@ struct UIScreen {
 
 /* UI State */
 global_variable UIScreen *activeScreen = NULL;
-global_variable bool asciiMode = true;
+global_variable bool asciiMode = false;
 
 
 /* 
@@ -476,7 +476,7 @@ rgbdist(u32 color1, u32 color2) {
 
 internal bool
 colors_are_distinct(u32 color1, u32 color2) {
-    if (rgbdist(color1, color2) > 5000) {
+    if (rgbdist(color1, color2) > 2000) {
         return true;
     }
     return false;
