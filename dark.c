@@ -46,6 +46,7 @@ typedef int64_t		i64;
 // Screen files
 #include "screen_in_game.c"
 #include "screen_launch.c"
+#include "screen_end_game.c"
 
 
 internal void 

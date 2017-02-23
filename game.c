@@ -132,6 +132,7 @@ global_variable List *messageLog = NULL;
 /* Necessary function declarations */
 
 void combat_attack(GameObject *attacker, GameObject *defender);
+internal UIScreen * screen_show_endgame();
 
 
 /* World State Management */
@@ -902,8 +903,8 @@ void health_check_death(GameObject *go) {
 			sasprintf(msg, "You have died.");
 			add_message(msg, 0xCC0000FF);
 			free(msg);
-			// TODO: Enter endgame flow
-
+			ui_set_active_screen(screen_show_endgame());
+		
 		} else {
 
 			Visibility *vis = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);

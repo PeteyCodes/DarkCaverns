@@ -49,7 +49,7 @@ screen_show_launch()
 // Render Functions -- 
 
 internal void 
-render_bg_view(Console *console) 
+render_bg_view(Console *console)  
 {
 	// We should load and process the bg image only once, not on each render
 	local_persist BitmapImage *bgImage = NULL;

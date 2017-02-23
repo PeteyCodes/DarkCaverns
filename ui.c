@@ -396,19 +396,6 @@ asciify_bitmap(Console *con, BitmapImage *image) {
             // Create a "1-bit" representation of the graphic indicating the "shape" of the cell
             BitmapImage *maskImage = image_mask_create(cellImage, primaryColor, secondaryColor);
 
-// DEBUG
-            // for (u32 y = 0; y < 16; y++) {
-            //     for (u32 x = 0; x < 16; x++) {
-            //         if (maskImage->pixels[y * 16 + x] == 0xffffffff) {
-            //             printf("1");
-            //         } else {
-            //             printf("0");
-            //         }
-            //     }
-            //     printf("\n");
-            // }
-// DEBUG
-
             // Determine the best fit glyph for the cell shape
             asciiChar glyph = image_match_glyph(con, maskImage);
 
