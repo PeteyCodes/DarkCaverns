@@ -595,7 +595,6 @@ internal asciiChar
 image_match_glyph(Console *console, BitmapImage *maskImage) {
     ConsoleFont *font = console->font;
     u32 fontCols = font->atlasWidth / font->charWidth;
-    u32 fontRows = font->atlasHeight / font->charHeight;
 
     u32 matchCount = 0;
     u32 matchIndex = 0;
@@ -603,7 +602,7 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
     asciiChar drawingGlyphs[] = {219, 220, 221, 222, 223, 226, 227, 228, 229, 230, 231, 0};
     u32 drawingGlyphCount = 12;
 
-    // Loop through all glyphs in the font, looking for the best match to the mask image
+    // Loop through all drawing glyphs, looking for the best match to the mask image
     for (u32 dgi = 0; dgi < drawingGlyphCount; dgi++) {
         u32 cellY = drawingGlyphs[dgi] / 16;
         u32 cellX = drawingGlyphs[dgi] % 16;
@@ -729,7 +728,7 @@ view_draw_ascii_image_at(Console *console, AsciiImage *image, i32 cellX, i32 cel
     for (u32 y = 0; y < image->rows; y++) {
         for (u32 x = 0; x < image->cols; x++) {
             ConsoleCell cc = image->cells[y * image->cols + x];
-            console_put_char_at(console, cc.glyph, x, y, cc.fgColor, cc.bgColor);
+            console_put_char_at(console, cc.glyph, cellX + x, cellY + y, cc.fgColor, cc.bgColor);
         }
     }
 }

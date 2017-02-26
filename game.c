@@ -1025,9 +1025,9 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	Combat *att = (Combat *)game_object_get_component(attacker, COMP_COMBAT);
 	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 
-	i32 hitRoll = rand() % 100;
+	i32 hitRoll = (rand() % 100) + 1;
 	i32 hitWindow = (att->toHit + att->toHitModifier) - def->hitModifier;
-	if (hitRoll < hitWindow) {
+	if ((hitRoll < hitWindow) || (hitRoll == 100)) {
 		// We have a hit
 		combat_deal_damage(attacker, defender);
 	}
