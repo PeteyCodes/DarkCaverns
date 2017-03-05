@@ -11,6 +11,7 @@
 #define LAYER_TOP		4
 
 #define MONSTER_TYPE_COUNT	100
+#define ITEM_TYPE_COUNT		100
 #define MAX_DUNGEON_LEVEL	20
 
 typedef enum {
@@ -20,6 +21,7 @@ typedef enum {
 	COMP_HEALTH,
 	COMP_MOVEMENT,
 	COMP_COMBAT,
+	COMP_EQUIPMENT,
 
 	/* Define other components above here */
 	COMPONENT_COUNT
@@ -86,6 +88,14 @@ typedef struct {
 	i32 hitModifier;		// % that attack was missed/dodged/etc
 } Combat;
 
+typedef struct {
+	i32 objectId;
+	i32 quantity;
+	i32 weight;
+	char *slot;
+	bool isEquipped;
+} Equipment;
+
 
 /* Level Support */
 
@@ -112,6 +122,7 @@ global_variable List *physicalComps;
 global_variable List *movementComps;
 global_variable List *healthComps;
 global_variable List *combatComps;
+global_variable List *equipmentComps;
 
 global_variable bool currentlyInGame = false;
 global_variable	bool recalculateFOV = false;
@@ -124,6 +135,8 @@ global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
 global_variable List *goPositions[MAP_WIDTH][MAP_HEIGHT];
 global_variable Config *monsterConfig = NULL;
 global_variable i32 monsterProbability[MONSTER_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
+global_variable Config *itemConfig = NULL;
+global_variable i32 itemProbability[ITEM_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
 global_variable Config *levelConfig = NULL;
 global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
 global_variable List *messageLog = NULL;
@@ -146,9 +159,11 @@ void world_state_init() {
 	movementComps = list_new(free);
 	healthComps = list_new(free);
 	combatComps = list_new(free);
+	equipmentComps = list_new(free);
 
 	// Parse necessary config files into memory
 	monsterConfig = config_file_parse("monsters.cfg");
+	itemConfig = config_file_parse("items.cfg");
 	levelConfig = config_file_parse("levels.cfg");
 
 	// Generate our monster appearance probability data
@@ -187,6 +202,8 @@ void world_state_init() {
 		free(copy);
 		e = list_next(e);
 	}
+
+	// TODO: Do the same for item probabilities
 
 	// Generate our level config data
 	e = list_head(levelConfig->entities);
@@ -470,6 +487,42 @@ void game_object_update_component(GameObject *obj,
 			break;
 		}
 
+		case COMP_EQUIPMENT: {
+			if (compData != NULL) {
+				Equipment *equip = obj->components[COMP_EQUIPMENT];
+				bool addedNew = false;
+				if (equip == NULL) {
+					equip = (Equipment *)malloc(sizeof(Equipment));
+					addedNew = true;
+				}
+
+				Equipment *equipData = (Equipment *)compData;
+				equip->objectId = obj->id;
+				equip->quantity = equipData->quantity;
+				equip->weight = equipData->weight;
+				if (equip->slot != NULL) {
+					equip->slot = malloc(strlen(equipData->slot) + 1);
+					strcpy(equip->slot, equipData->slot);
+				}
+				equip->isEquipped = equipData->isEquipped;
+
+				if (addedNew) {
+					list_insert_after(equipmentComps, NULL, equip);				
+				}
+				obj->components[comp] = equip;
+				
+			} else {
+				// Clear component 
+				Equipment *e = obj->components[COMP_EQUIPMENT];
+				if (e != NULL) {
+					list_remove_element_with_data(equipmentComps, e);				
+				}
+				obj->components[comp] = NULL;				
+			}
+
+			break;
+		}
+
 		default:
 			assert(1 == 0);
 	}
@@ -494,6 +547,9 @@ void game_object_destroy(GameObject *obj) {
 
 	elementToRemove = list_search(combatComps, obj->components[COMP_COMBAT]);
 	if (elementToRemove != NULL ) { list_remove(combatComps, elementToRemove); }
+
+	elementToRemove = list_search(equipmentComps, obj->components[COMP_EQUIPMENT]);
+	if (elementToRemove != NULL ) { list_remove(equipmentComps, elementToRemove); }
 
 	// TODO: Clean up other components used by this object
 
