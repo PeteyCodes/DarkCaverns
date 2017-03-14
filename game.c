@@ -85,7 +85,7 @@ typedef struct {
 	i32 attackModifier;		// based on weapons/items
 	i32 defense;			// defense = damage absorbed before HP is affected
 	i32 defenseModifier;	// based on armor/items
-	i32 hitModifier;		// % that attack was missed/dodged/etc
+	i32 dodgeModifier;		// % that attack was missed/dodged/etc
 } Combat;
 
 typedef struct {
@@ -139,6 +139,7 @@ global_variable Config *itemConfig = NULL;
 global_variable i32 itemProbability[ITEM_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
 global_variable Config *levelConfig = NULL;
 global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
+global_variable i32 maxItems[MAX_DUNGEON_LEVEL];
 global_variable List *messageLog = NULL;
 
 
@@ -148,7 +149,78 @@ void combat_attack(GameObject *attacker, GameObject *defender);
 internal UIScreen * screen_show_endgame();
 
 
+
 /* World State Management */
+
+void get_appearance_prob(Config *config, i32 (*probabilities)[MAX_DUNGEON_LEVEL]) {
+	ListElement *e = list_head(config->entities);
+	while (e != NULL) {
+		ConfigEntity *entity = (ConfigEntity *)e->data;
+		char *appearance_prob = config_entity_value(entity, "appearance_prob");
+		char *copy = (char *)malloc(strlen(appearance_prob) + 1);
+		strcpy(copy, appearance_prob);
+
+		char *idString = config_entity_value(entity, "id");
+		i32 id = atoi(idString);
+
+		char *lvl = strtok(copy, ",");
+		if (lvl != NULL) {
+			i32 lastLvl = 0;
+			bool probData = true;
+			while (probData) {
+				char *prob = strtok(NULL, ",");
+				i32 lvlNum = atoi(lvl);
+				i32 probNum = atoi(prob);	
+
+				// Fill in the probabilities from our last filled level to the current level
+				for (i32 i = lastLvl; i < lvlNum; i++) {
+					probabilities[id-1][i] = probNum;							
+				}				
+
+				lastLvl = lvlNum;
+				lvl = strtok(NULL, ",");
+				if (lvl == NULL) {
+					probData = false;
+				}
+			}
+		}
+
+		free(copy);
+		e = list_next(e);
+	}
+
+}
+
+void get_max_counts(ConfigEntity *entity, char *propertyName, i32 *maxCounts) {
+	char *countsString = config_entity_value(entity, propertyName);
+	char *copy = (char *)malloc(strlen(countsString) + 1);
+	strcpy(copy, countsString);
+
+	char *lvl = strtok(copy, ",");
+	if (lvl != NULL) {
+		i32 lastLvl = 0;
+		bool lvlCountData = true;
+		while (lvlCountData) {
+			char *sCount = strtok(NULL, ",");
+			i32 lvlNum = atoi(lvl);
+			i32 maxCount = atoi(sCount);
+
+			// Fill in the probabilities from our last filled level to the current level
+			for (i32 i = lastLvl; i < lvlNum; i++) {
+				maxCounts[i] = maxCount;
+			}				
+
+			lastLvl = lvlNum;
+			lvl = strtok(NULL, ",");
+			if (lvl == NULL) {
+				lvlCountData = false;
+			}
+		}
+	}
+
+	free(copy);
+}
+
 void world_state_init() {
 	for (u32 i = 0; i < MAX_GO; i++) {
 		gameObjects[i].id = UNUSED;
@@ -167,75 +239,17 @@ void world_state_init() {
 	levelConfig = config_file_parse("levels.cfg");
 
 	// Generate our monster appearance probability data
-	ListElement *e = list_head(monsterConfig->entities);
-	while (e != NULL) {
-		ConfigEntity *entity = (ConfigEntity *)e->data;
-		char *appearance_prob = config_entity_value(entity, "appearance_prob");
-		char *copy = (char *)malloc(strlen(appearance_prob) + 1);
-		strcpy(copy, appearance_prob);
+	get_appearance_prob(monsterConfig, monsterProbability);
 
-		char *monsterId = config_entity_value(entity, "monster_id");
-		i32 monId = atoi(monsterId);
+	// Do the same for item probabilities
+	get_appearance_prob(itemConfig, itemProbability);
 
-		char *lvl = strtok(copy, ",");
-		if (lvl != NULL) {
-			i32 lastLvl = 0;
-			bool probData = true;
-			while (probData) {
-				char *prob = strtok(NULL, ",");
-				i32 lvlNum = atoi(lvl);
-				i32 probNum = atoi(prob);	
-
-				// Fill in the probabilities from our last filled level to the current level
-				for (i32 i = lastLvl; i < lvlNum; i++) {
-					monsterProbability[monId-1][i] = probNum;							
-				}				
-
-				lastLvl = lvlNum;
-				lvl = strtok(NULL, ",");
-				if (lvl == NULL) {
-					probData = false;
-				}
-			}
-		}
-
-		free(copy);
-		e = list_next(e);
-	}
-
-	// TODO: Do the same for item probabilities
-
-	// Generate our level config data
-	e = list_head(levelConfig->entities);
+	// Get level generation config information
+	ListElement *e = list_head(levelConfig->entities);
 	if (e != NULL) {
 		ConfigEntity *levelEntity = (ConfigEntity *)e->data;
-		char *lvlMonsters = config_entity_value(levelEntity, "max_monsters");
-		char *copy = (char *)malloc(strlen(lvlMonsters) + 1);
-		strcpy(copy, lvlMonsters);
-
-		char *lvl = strtok(copy, ",");
-		if (lvl != NULL) {
-			i32 lastLvl = 0;
-			bool lvlMonData = true;
-			while (lvlMonData) {
-				char *monCount = strtok(NULL, ",");
-				i32 lvlNum = atoi(lvl);
-				i32 maxMon = atoi(monCount);
-
-				// Fill in the probabilities from our last filled level to the current level
-				for (i32 i = lastLvl; i < lvlNum; i++) {
-					maxMonsters[i] = maxMon;
-				}				
-
-				lastLvl = lvlNum;
-				lvl = strtok(NULL, ",");
-				if (lvl == NULL) {
-					lvlMonData = false;
-				}
-			}
-		}
-
-		free(copy);
+		get_max_counts(levelEntity, "max_monsters", maxMonsters);
+		get_max_counts(levelEntity, "max_items", maxItems);
 	}
 
 	// TODO: Other one-time data generation using config data?
@@ -244,6 +258,7 @@ void world_state_init() {
 
 
 /* Game Object Management */
+
 GameObject *game_object_create() {
 	// Find the next available object space
 	GameObject *go = NULL;
@@ -468,7 +483,7 @@ void game_object_update_component(GameObject *obj,
 				com->defense = combatData->defense;
 				com->attackModifier = combatData->attackModifier;
 				com->defenseModifier = combatData->defenseModifier;
-				com->hitModifier = combatData->hitModifier;
+				com->dodgeModifier = combatData->dodgeModifier;
 
 				if (addedNew) {
 					list_insert_after(combatComps, NULL, com);				
@@ -582,7 +597,26 @@ void floor_add(u8 x, u8 y) {
 	game_object_update_component(floor, COMP_PHYSICAL, &floorPhys);
 }
 
-void npc_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, i32 toHit, i32 hitMod, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
+void item_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, 
+	i32 hitMod, i32 attMod, i32 defMod, i32 dodgeMod, i32 quantity, i32 weight, char *slot) {
+
+	GameObject *item = game_object_create();
+	Position pos = {.objectId = item->id, .x = x, .y = y, .layer = layer};
+	game_object_update_component(item, COMP_POSITION, &pos);
+	Physical phys = {.objectId = item->id, .blocksMovement = false, .blocksSight = false};
+	game_object_update_component(item, COMP_PHYSICAL, &phys);
+	Visibility vis = {.objectId = item->id, .glyph = glyph, .fgColor = fgColor, .bgColor = 0x00000000, .visibleOutsideFOV = false, .name = name};
+	game_object_update_component(item, COMP_VISIBILITY, &vis);
+	Combat com = {.objectId = item->id, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod, .dodgeModifier = dodgeMod};
+	game_object_update_component(item, COMP_COMBAT, &com);
+	Equipment eq = {.objectId = item->id, .quantity = quantity, .weight = weight, .slot = slot};
+	game_object_update_component(item, COMP_EQUIPMENT, &eq);
+}
+
+void npc_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, 
+	u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, 
+	i32 toHit, i32 hitMod, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
+	
 	GameObject *npc = game_object_create();
 	Position pos = {.objectId = npc->id, .x = x, .y = y, .layer = layer};
 	game_object_update_component(npc, COMP_POSITION, &pos);
@@ -595,7 +629,7 @@ void npc_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, u32
 	game_object_update_component(npc, COMP_MOVEMENT, &mv);
 	Health hlth = {.objectId = npc->id, .currentHP = maxHP, .maxHP = maxHP, .recoveryRate = hpRecRate};
 	game_object_update_component(npc, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .toHit = toHit, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod, .hitModifier = dodgeMod};
+	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .toHit = toHit, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod, .dodgeModifier = dodgeMod};
 	game_object_update_component(npc, COMP_COMBAT, &com);
 }
 
@@ -623,7 +657,18 @@ Point level_get_open_point(bool (*mapCells)[MAP_HEIGHT]) {
 	}
 }
 
-// TODO: Move this somewhere appropriate
+i32 item_for_level(i32 level) {
+	u32 r = rand() % 100;
+	u32 accum = 0;
+	for (int i = 0; i < ITEM_TYPE_COUNT; i++) {
+		accum += itemProbability[i][level-1];
+		if (accum >= r) {
+			return i + 1;
+		}
+	}
+	return 1;
+}
+
 i32 monster_for_level(i32 level) {
 	u32 r = rand() % 100;
 	u32 accum = 0;
@@ -636,12 +681,12 @@ i32 monster_for_level(i32 level) {
 	return 1;
 }
 
-ConfigEntity * get_monster_config(Config *config, i32 id) {
+ConfigEntity * get_entity_with_id(Config *config, i32 id) {
 	ListElement *e = list_head(config->entities);
 	while (e != NULL) {
 		ConfigEntity *entity = (ConfigEntity *)e->data;
-		i32 monsterId = atoi(config_entity_value(entity, "monster_id"));
-		if (monsterId == id) {
+		i32 eId = atoi(config_entity_value(entity, "id"));
+		if (eId == id) {
 			return entity;
 		}
 
@@ -687,9 +732,9 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	for (i32 i = 0; i < monstersToAdd; i++) {
 		// Consult our monster appearance data to determine what monster to generate.
 		i32 monsterId = monster_for_level(levelToGenerate);
-		ConfigEntity *monsterEntity = get_monster_config(monsterConfig, monsterId);
+		ConfigEntity *monsterEntity = get_entity_with_id(monsterConfig, monsterId);
 
-		if (monsterConfig != NULL) {
+		if (monsterEntity != NULL) {
 			// Add the monster		
 			Point pt = level_get_open_point(mapCells);
 			char *name = config_entity_value(monsterEntity, "name");
@@ -710,6 +755,35 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			i32 def = atoi(config_entity_value(monsterEntity, "com_defense"));
 
 			npc_add(name, pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, hit, 0, att, def, 0, 0, 0);
+		}
+	}
+
+	// Sprinkle some items throughout the level
+	i32 itemsToAdd = maxItems[levelToGenerate-1];
+	for (i32 i = 0; i < itemsToAdd; i++) {
+		// Consult our item appearance data to determine what item to generate.
+		i32 itemId = item_for_level(levelToGenerate);
+		ConfigEntity *entity = get_entity_with_id(itemConfig, itemId);
+
+		if (entity != NULL) {
+			// Add the monster		
+			Point pt = level_get_open_point(mapCells);
+			char *name = config_entity_value(entity, "name");
+			char *glyph = config_entity_value(entity, "vis_glyph");
+			asciiChar g = *glyph;
+			char *color = config_entity_value(entity, "vis_color");
+			u32 c = xtoi(color);
+
+			i32 toHitMod = atoi(config_entity_value(entity, "com_toHitModifier"));
+			i32 attMod = atoi(config_entity_value(entity, "com_attackModifier"));
+			i32 defMod = atoi(config_entity_value(entity, "com_defenseModifier"));
+			i32 dodgeMod = atoi(config_entity_value(entity, "com_dodgeModifier"));
+
+			i32 qty = atoi(config_entity_value(entity, "eq_quantity"));
+			char *slot = config_entity_value(entity, "eq_slot");
+			i32 weight = atoi(config_entity_value(entity, "eq_weight"));
+
+			item_add(name, pt.x, pt.y, LAYER_MID, g, c, toHitMod, attMod, defMod, dodgeMod, qty, weight, slot);
 		}
 	}
 	
@@ -1082,7 +1156,7 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 
 	i32 hitRoll = (rand() % 100) + 1;
-	i32 hitWindow = (att->toHit + att->toHitModifier) - def->hitModifier;
+	i32 hitWindow = (att->toHit + att->toHitModifier) - def->dodgeModifier;
 	if ((hitRoll < hitWindow) || (hitRoll == 100)) {
 		// We have a hit
 		combat_deal_damage(attacker, defender);
@@ -1111,7 +1185,7 @@ game_new()
 	game_object_update_component(player, COMP_PHYSICAL, &phys);
 	Health hlth = {.objectId = player->id, .currentHP = 20, .maxHP = 20, .recoveryRate = 1};
 	game_object_update_component(player, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .hitModifier = 0};
+	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .dodgeModifier = 0};
 	game_object_update_component(player, COMP_COMBAT, &com);
 
 	// Create a level and place our player in it
