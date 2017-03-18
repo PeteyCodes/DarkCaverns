@@ -1,4 +1,4 @@
- /*
+/*
     In-Game Screen
 
     Written by Peter de Tagyos
@@ -71,21 +71,23 @@ render_game_map_view(Console *console)
 	while (e != NULL) {
 		Visibility *vis = (Visibility *)list_data(e);
 		Position *p = (Position *)game_object_get_component(&gameObjects[vis->objectId], COMP_POSITION);
-		if (fovMap[p->x][p->y] > 0) {
-			vis->hasBeenSeen = true;
-			// Don't render if we've already written something to to this cell at a higher layer
-			if (p->layer > layerRendered[p->x][p->y]) {
-				console_put_char_at(console, vis->glyph, p->x, p->y, vis->fgColor, vis->bgColor);
-				layerRendered[p->x][p->y] = p->layer;
-			}
+		if (p != NULL) {
+			if (fovMap[p->x][p->y] > 0) {
+				vis->hasBeenSeen = true;
+				// Don't render if we've already written something to to this cell at a higher layer
+				if (p->layer > layerRendered[p->x][p->y]) {
+					console_put_char_at(console, vis->glyph, p->x, p->y, vis->fgColor, vis->bgColor);
+					layerRendered[p->x][p->y] = p->layer;
+				}
 
-		} else if (vis->visibleOutsideFOV && vis->hasBeenSeen) {
-			u32 fullColor = vis->fgColor;
-			u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
-			// Don't render if we've already written something to to this cell at a higher layer
-			if (p->layer > layerRendered[p->x][p->y]) {
-				console_put_char_at(console, vis->glyph, p->x, p->y, fadedColor, 0x000000FF);
-				layerRendered[p->x][p->y] = p->layer;
+			} else if (vis->visibleOutsideFOV && vis->hasBeenSeen) {
+				u32 fullColor = vis->fgColor;
+				u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
+				// Don't render if we've already written something to to this cell at a higher layer
+				if (p->layer > layerRendered[p->x][p->y]) {
+					console_put_char_at(console, vis->glyph, p->x, p->y, fadedColor, 0x000000FF);
+					layerRendered[p->x][p->y] = p->layer;
+				}
 			}
 		}
 		e = list_next(e);
@@ -320,6 +322,11 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 						playerTookTurn = true;		
 					}
 				}	
+			}
+			break;
+
+			case SDLK_g: {
+				item_get();
 			}
 			break;
 

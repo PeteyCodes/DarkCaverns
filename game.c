@@ -124,6 +124,9 @@ global_variable List *healthComps;
 global_variable List *combatComps;
 global_variable List *equipmentComps;
 
+global_variable List *carriedItems;
+global_variable i32 maxWeightAllowed = 20;
+
 global_variable bool currentlyInGame = false;
 global_variable	bool recalculateFOV = false;
 global_variable	bool playerTookTurn = false;
@@ -232,6 +235,8 @@ void world_state_init() {
 	healthComps = list_new(free);
 	combatComps = list_new(free);
 	equipmentComps = list_new(free);
+
+	carriedItems = list_new(free);
 
 	// Parse necessary config files into memory
 	monsterConfig = config_file_parse("monsters.cfg");
@@ -1168,6 +1173,96 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
 
 
+/* Item Management routines */
+
+i32 item_get_weight_carried() {
+	i32 totalWeight = 0;
+
+	ListElement *e = list_head(carriedItems);
+	while (e != NULL) {
+		Equipment *eq = (Equipment *)list_data(e);
+		totalWeight += eq->weight;
+		e = list_next(e);
+	}
+	
+	return totalWeight;
+}
+
+void item_get() {
+	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+	// Get the item at player's current position
+	List *objects = game_objects_at_position(playerPos->x, playerPos->y);
+	GameObject *itemObj = NULL;
+	Equipment *eq = NULL;
+	ListElement *e = list_head(objects);
+	while (e != NULL) {
+		GameObject *go = (GameObject *)list_data(e);
+		eq = (Equipment *)game_object_get_component(go, COMP_EQUIPMENT);
+		if (eq != NULL) {
+			itemObj = go;
+			break;
+		}
+		e = list_next(e);
+	}
+	if (itemObj != NULL && eq != NULL) {
+		// Can the player pick it up (are they carrying too much already?)
+		i32 carriedWeight = item_get_weight_carried();
+		if (carriedWeight + eq->weight <= maxWeightAllowed) {
+			// Add the item to the player's carried items
+			list_insert_after(carriedItems, NULL, eq);
+
+			// Remove the item from the map (take away its Position comp)
+			game_object_update_component(itemObj, COMP_POSITION, NULL);
+
+			// Write an appropriate message to the log
+			Visibility *v = (Visibility *)game_object_get_component(itemObj, COMP_VISIBILITY);
+			if (v != NULL) {
+				char *msg = NULL;
+				sasprintf(msg, "You picked up the %s.", v->name);
+				add_message(msg, 0x009900ff);
+				free(msg);
+			}
+
+		} else {
+			// Too much to carry
+			char *msg = NULL;
+			sasprintf(msg, "You are carrying too much already.");
+			add_message(msg, 0x990000ff);
+			free(msg);
+		}
+
+	}
+}
+
+
+/* Environment Management routines */
+
+void environment_update(Position *playerPos) {
+	// Check to see if there are any items at player's current position
+	List *objects = game_objects_at_position(playerPos->x, playerPos->y);
+	GameObject *itemObj = NULL;
+	ListElement *e = list_head(objects);
+	while (e != NULL) {
+		GameObject *go = (GameObject *)list_data(e);
+		Equipment *eqComp = (Equipment *)game_object_get_component(go, COMP_EQUIPMENT);
+		if (eqComp != NULL) {
+			itemObj = go;
+			break;
+		}
+		e = list_next(e);
+	}
+	if (itemObj != NULL) {
+		Visibility *v = (Visibility *)game_object_get_component(itemObj, COMP_VISIBILITY);
+		if (v != NULL) {
+			char *msg = NULL;
+			sasprintf(msg, "There is a %s here. [G]et it?", v->name);
+			add_message(msg, 0x009900ff);
+			free(msg);
+		}
+	}
+}
+
+
 /* High-level Game Routines */
 
 
@@ -1206,6 +1301,7 @@ game_update()
 		Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 		generate_target_map(playerPos->x, playerPos->y);
 		movement_update();			
+		environment_update(playerPos);
 
 		health_removal_update();
 	}
