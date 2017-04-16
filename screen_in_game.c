@@ -98,10 +98,10 @@ render_game_map_view(Console *console)
 internal void 
 render_inventory_view(Console *console) 
 {
-
 	UIRect rect = {0, 0, INVENTORY_WIDTH, INVENTORY_HEIGHT};
 	view_draw_rect(console, &rect, 0x222222FF, 1, 0xFF990099);
 
+	
 }
 
 internal void 
