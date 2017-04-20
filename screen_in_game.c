@@ -17,6 +17,9 @@
 #define INVENTORY_HEIGHT	30
 
 
+global_variable UIView *inventoryView = NULL;
+
+
 internal void render_game_map_view(Console *console);
 internal void render_message_log_view(Console *console);
 internal void render_stats_view(Console *console);
@@ -101,7 +104,39 @@ render_inventory_view(Console *console)
 	UIRect rect = {0, 0, INVENTORY_WIDTH, INVENTORY_HEIGHT};
 	view_draw_rect(console, &rect, 0x222222FF, 1, 0xFF990099);
 
-	
+	// We should load and process the bg image only once, not on each render
+	local_persist BitmapImage *bgImage = NULL;
+	local_persist AsciiImage *aiImage = NULL;
+	if (bgImage == NULL) {
+		bgImage = image_load_from_file("./scrollBackground.png");
+		aiImage = asciify_bitmap(console, bgImage);	
+	}
+
+	if (asciiMode) {
+		view_draw_ascii_image_at(console, aiImage, 0, 0);
+	} else {
+		view_draw_image_at(console, bgImage, 0, 0);	
+	}
+
+
+	// Render list of carried items
+	i32 yIdx = 4;
+	ListElement *e = list_head(carriedItems);
+	while (e != NULL) {
+		// For each item - Equipped indicator, Item name, [slot], weight
+		GameObject *go = (GameObject *)e->data;
+		Visibility *v = game_object_get_component(go, COMP_VISIBILITY);
+		Equipment *eq = game_object_get_component(go, COMP_EQUIPMENT);
+		if (v != NULL && eq != NULL) {
+			char *equipped = (eq->isEquipped) ? "*" : ".";
+			char *itemText = String_Create("%s %s [%s] wt: %d", equipped, v->name, eq->slot, eq->weight);
+			console_put_string_at(console, itemText, 4, yIdx, 0x333333ff, 0x00000000);
+			yIdx += 1;
+		}
+		e = list_next(e);
+	}
+
+
 }
 
 internal void 
@@ -161,15 +196,13 @@ render_stats_view(Console *console)
 	}
 
 	Combat *playerCombat = game_object_get_component(player, COMP_COMBAT);
-	char *att = NULL;
-	sasprintf(att, "ATT: %d (%d)", playerCombat->attack, playerCombat->attackModifier);
+	char *att = String_Create("ATT: %d (%d)", playerCombat->attack, playerCombat->attackModifier);
 	console_put_string_at(console, att, 0, 2, 0xe6e600FF, 0x00000000);
-	free(att);
+	String_Destroy(att);
 
-	char *def = NULL;
-	sasprintf(def, "DEF: %d (%d)", playerCombat->defense, playerCombat->defenseModifier);
+	char *def = String_Create("DEF: %d (%d)", playerCombat->defense, playerCombat->defenseModifier);
 	console_put_string_at(console, def, 0, 3, 0xe6e600FF, 0x00000000);
-	free(def);
+	String_Destroy(def);
 
 }
 
@@ -177,14 +210,24 @@ render_stats_view(Console *console)
 // Screen Functions
 
 internal void 
+hide_inventory_overlay(UIScreen *screen) 
+{
+	if (inventoryView != NULL) {
+		list_remove_element_with_data(screen->views, inventoryView);
+		view_destroy(inventoryView);
+		inventoryView = NULL;
+	}
+}
+
+internal void 
 show_inventory_overlay(UIScreen *screen) 
 {
-
-	UIRect overlayRect = {(16 * INVENTORY_LEFT), (16 * INVENTORY_TOP), (16 * INVENTORY_WIDTH), (16 * INVENTORY_HEIGHT)};
-	UIView *overlayView = view_new(overlayRect, INVENTORY_WIDTH, INVENTORY_HEIGHT, 
-							   "./terminal16x16.png", 0, render_inventory_view);
-	list_insert_after(screen->views, list_tail(screen->views), overlayView);
-
+	if (inventoryView == NULL) {
+		UIRect overlayRect = {(16 * INVENTORY_LEFT), (16 * INVENTORY_TOP), (16 * INVENTORY_WIDTH), (16 * INVENTORY_HEIGHT)};
+		inventoryView = view_new(overlayRect, INVENTORY_WIDTH, INVENTORY_HEIGHT, 
+								   "./terminal16x16.png", 0, render_inventory_view);
+		list_insert_after(screen->views, list_tail(screen->views), inventoryView);
+	}
 }
 
 
@@ -331,7 +374,11 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 			break;
 
 			case SDLK_i: {
-				show_inventory_overlay(activeScreen);
+				if (inventoryView == NULL) {
+					show_inventory_overlay(activeScreen);				
+				} else {
+					hide_inventory_overlay(activeScreen);
+				}
 			}
 			break;
 

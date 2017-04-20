@@ -34,6 +34,7 @@ typedef int64_t		i64;
 #define global_variable static
 
 #include "util.c"
+#include "String.c"
 #include "list.c"
 #include "config.c"
 // #define HASHMAP_IMPLEMENTATION

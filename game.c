@@ -1034,10 +1034,9 @@ void health_check_death(GameObject *go) {
 	if (h->currentHP <= 0) {
 		// Death!
 		if (go == player) {
-			char *msg = NULL;
-			sasprintf(msg, "You have died.");
+			char *msg = String_Create("You have died.");
 			add_message(msg, 0xCC0000FF);
-			free(msg);
+			String_Destroy(msg);
 			ui_set_active_screen(screen_show_endgame());
 		
 		} else {
@@ -1046,10 +1045,9 @@ void health_check_death(GameObject *go) {
 			vis->glyph = '%';
 			vis->fgColor = 0x990000FF;
 
-			char *msg = NULL;
-			sasprintf(msg, "You killed the %s.", vis->name);
+			char *msg = String_Create("You killed the %s.", vis->name);
 			add_message(msg, 0xff9900FF);
-			free(msg);
+			String_Destroy(msg);
 
 			Position *pos = (Position *)game_object_get_component(go, COMP_POSITION);
 			pos->layer = LAYER_GROUND;
@@ -1136,17 +1134,15 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 	} else {
 		if (attacker == player) {
 			Visibility *vis = game_object_get_component(defender, COMP_VISIBILITY);
-			char *msg = NULL;
-			sasprintf(msg, "You hit the %s for %d damage.", vis->name, (totAtt - totDef));
+			char *msg = String_Create("You hit the %s for %d damage.", vis->name, (totAtt - totDef));
 			add_message(msg, 0xCCCCCCFF);
-			free(msg);
+			String_Destroy(msg);
 
 		} else {
 			Visibility *vis = game_object_get_component(attacker, COMP_VISIBILITY);
-			char *msg = NULL;
-			sasprintf(msg, "The %s hits you for %d damage.", vis->name, (totAtt - totDef));
+			char *msg = String_Create("The %s hits you for %d damage.", vis->name, (totAtt - totDef));
 			add_message(msg, 0xCCCCCCFF);
-			free(msg);
+			String_Destroy(msg);
 		}
 
 
@@ -1180,7 +1176,8 @@ i32 item_get_weight_carried() {
 
 	ListElement *e = list_head(carriedItems);
 	while (e != NULL) {
-		Equipment *eq = (Equipment *)list_data(e);
+		GameObject *go = (GameObject *)list_data(e);
+		Equipment *eq = game_object_get_component(go, COMP_EQUIPMENT);
 		totalWeight += eq->weight;
 		e = list_next(e);
 	}
@@ -1209,7 +1206,7 @@ void item_get() {
 		i32 carriedWeight = item_get_weight_carried();
 		if (carriedWeight + eq->weight <= maxWeightAllowed) {
 			// Add the item to the player's carried items
-			list_insert_after(carriedItems, NULL, eq);
+			list_insert_after(carriedItems, NULL, itemObj);
 
 			// Remove the item from the map (take away its Position comp)
 			game_object_update_component(itemObj, COMP_POSITION, NULL);
@@ -1217,18 +1214,16 @@ void item_get() {
 			// Write an appropriate message to the log
 			Visibility *v = (Visibility *)game_object_get_component(itemObj, COMP_VISIBILITY);
 			if (v != NULL) {
-				char *msg = NULL;
-				sasprintf(msg, "You picked up the %s.", v->name);
+				char *msg = String_Create("You picked up the %s.", v->name);
 				add_message(msg, 0x009900ff);
-				free(msg);
+				String_Destroy(msg);
 			}
 
 		} else {
 			// Too much to carry
-			char *msg = NULL;
-			sasprintf(msg, "You are carrying too much already.");
+			char *msg = String_Create("You are carrying too much already.");
 			add_message(msg, 0x990000ff);
-			free(msg);
+			String_Destroy(msg);
 		}
 
 	}
@@ -1254,10 +1249,9 @@ void environment_update(Position *playerPos) {
 	if (itemObj != NULL) {
 		Visibility *v = (Visibility *)game_object_get_component(itemObj, COMP_VISIBILITY);
 		if (v != NULL) {
-			char *msg = NULL;
-			sasprintf(msg, "There is a %s here. [G]et it?", v->name);
+			char *msg = String_Create("There is a %s here. [G]et it?", v->name);
 			add_message(msg, 0x009900ff);
-			free(msg);
+			String_Destroy(msg);
 		}
 	}
 }
