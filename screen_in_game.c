@@ -18,6 +18,7 @@
 
 
 global_variable UIView *inventoryView = NULL;
+global_variable i32 highlightedIdx = 0;
 
 
 internal void render_game_map_view(Console *console);
@@ -121,6 +122,7 @@ render_inventory_view(Console *console)
 
 	// Render list of carried items
 	i32 yIdx = 4;
+	i32 currIdx = 0;
 	ListElement *e = list_head(carriedItems);
 	while (e != NULL) {
 		// For each item - Equipped indicator, Item name, [slot], weight
@@ -129,10 +131,16 @@ render_inventory_view(Console *console)
 		Equipment *eq = game_object_get_component(go, COMP_EQUIPMENT);
 		if (v != NULL && eq != NULL) {
 			char *equipped = (eq->isEquipped) ? "*" : ".";
-			char *itemText = String_Create("%s %s [%s] wt: %d", equipped, v->name, eq->slot, eq->weight);
-			console_put_string_at(console, itemText, 4, yIdx, 0x333333ff, 0x00000000);
+			char *slotStr = String_Create("[%s]", eq->slot);
+			char *itemText = String_Create("%s %-10s %-8s wt: %d", equipped, v->name, slotStr, eq->weight);
+			if (currIdx == highlightedIdx) {
+				console_put_string_at(console, itemText, 6, yIdx, 0xffffffff, 0x80000099);
+			} else {
+				console_put_string_at(console, itemText, 6, yIdx, 0x333333ff, 0x00000000);
+			}
 			yIdx += 1;
 		}
+		currIdx += 1;
 		e = list_next(e);
 	}
 
@@ -255,59 +263,75 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 			// END DEBUG
 
 			case SDLK_UP: {
-				Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1, LAYER_TOP};
-				if (can_move(newPos)) {
-					game_object_update_component(player, COMP_POSITION, &newPos);
-					recalculateFOV = true;					
-					playerTookTurn = true;		
+				if (inventoryView != NULL) {
+					// Handle for inventory view
+					highlightedIdx -= 1;
+					if (highlightedIdx < 0) { highlightedIdx = 0; }
 
 				} else {
-					// Check to see what is blocking movement. If NPC - resolve combat!
-					List *blockers = game_objects_at_position(playerPos->x, playerPos->y - 1);
-					GameObject *blockerObj = NULL;
-					ListElement *e = list_head(blockers);
-					while (e != NULL) {
-						GameObject *go = (GameObject *)list_data(e);
-						Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
-						if (cc != NULL) {
-							blockerObj = go;
-							break;
-						}
-						e = list_next(e);
-					}
-					if (blockerObj != NULL) {
-						combat_attack(player, blockerObj);
+					// Handle for main in-game screen
+					Position newPos = {playerPos->objectId, playerPos->x, playerPos->y - 1, LAYER_TOP};
+					if (can_move(newPos)) {
+						game_object_update_component(player, COMP_POSITION, &newPos);
+						recalculateFOV = true;					
 						playerTookTurn = true;		
-					}
-				}	
+
+					} else {
+						// Check to see what is blocking movement. If NPC - resolve combat!
+						List *blockers = game_objects_at_position(playerPos->x, playerPos->y - 1);
+						GameObject *blockerObj = NULL;
+						ListElement *e = list_head(blockers);
+						while (e != NULL) {
+							GameObject *go = (GameObject *)list_data(e);
+							Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
+							if (cc != NULL) {
+								blockerObj = go;
+								break;
+							}
+							e = list_next(e);
+						}
+						if (blockerObj != NULL) {
+							combat_attack(player, blockerObj);
+							playerTookTurn = true;		
+						}
+					}	
+				}
 			}
 			break;
 
 			case SDLK_DOWN: {
-				Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1, LAYER_TOP};
-				if (can_move(newPos)) {
-					game_object_update_component(player, COMP_POSITION, &newPos);							
-					recalculateFOV = true;							
-					playerTookTurn = true;		
+				if (inventoryView != NULL) {
+					// Handle for inventory view
+					highlightedIdx += 1;
+					if (highlightedIdx > list_size(carriedItems)-1) { highlightedIdx = list_size(carriedItems) - 1; }
+					
 				} else {
-					// Check to see what is blocking movement. If NPC - resolve combat!
-					List *blockers = game_objects_at_position(playerPos->x, playerPos->y + 1);
-					GameObject *blockerObj = NULL;
-					ListElement *e = list_head(blockers);
-					while (e != NULL) {
-						GameObject *go = (GameObject *)list_data(e);
-						Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
-						if (cc != NULL) {
-							blockerObj = go;
-							break;
-						}
-						e = list_next(e);
-					}
-					if (blockerObj != NULL) {
-						combat_attack(player, blockerObj);
+					// Handle for main in-game view
+					Position newPos = {playerPos->objectId, playerPos->x, playerPos->y + 1, LAYER_TOP};
+					if (can_move(newPos)) {
+						game_object_update_component(player, COMP_POSITION, &newPos);							
+						recalculateFOV = true;							
 						playerTookTurn = true;		
-					}
-				}	
+					} else {
+						// Check to see what is blocking movement. If NPC - resolve combat!
+						List *blockers = game_objects_at_position(playerPos->x, playerPos->y + 1);
+						GameObject *blockerObj = NULL;
+						ListElement *e = list_head(blockers);
+						while (e != NULL) {
+							GameObject *go = (GameObject *)list_data(e);
+							Combat *cc = (Combat *)game_object_get_component(go, COMP_COMBAT);
+							if (cc != NULL) {
+								blockerObj = go;
+								break;
+							}
+							e = list_next(e);
+						}
+						if (blockerObj != NULL) {
+							combat_attack(player, blockerObj);
+							playerTookTurn = true;		
+						}
+					}	
+				}
 			}
 			break;
 
@@ -365,6 +389,16 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 						playerTookTurn = true;		
 					}
 				}	
+			}
+			break;
+
+			case SDLK_e: {
+				if (inventoryView != NULL) {
+					ListElement *le = list_item_at(carriedItems, highlightedIdx);
+					if (le != NULL) {
+						item_toggle_equip(le->data);
+					}
+				}
 			}
 			break;
 

@@ -520,7 +520,7 @@ void game_object_update_component(GameObject *obj,
 				equip->objectId = obj->id;
 				equip->quantity = equipData->quantity;
 				equip->weight = equipData->weight;
-				if (equip->slot != NULL) {
+				if (equipData->slot != NULL) {
 					equip->slot = malloc(strlen(equipData->slot) + 1);
 					strcpy(equip->slot, equipData->slot);
 				}
@@ -1226,6 +1226,49 @@ void item_get() {
 			String_Destroy(msg);
 		}
 
+	}
+}
+
+void item_toggle_equip(GameObject *item) {
+	if (item == NULL) { return; }
+
+	Equipment *eq = (Equipment *)game_object_get_component(item, COMP_EQUIPMENT);
+	if (eq != NULL) {
+		eq->isEquipped = !eq->isEquipped;
+		Combat *playerCombat = (Combat *)game_object_get_component(player, COMP_COMBAT);
+		Combat *c = (Combat *)game_object_get_component(item, COMP_COMBAT);
+		if (eq->isEquipped) {
+			// Apply the effects of equipping that item
+			playerCombat->toHitModifier += c->toHitModifier;
+			playerCombat->attackModifier += c->attackModifier;
+			playerCombat->defenseModifier += c->defenseModifier;
+			playerCombat->dodgeModifier += c->dodgeModifier;
+
+			// Loop through all other carried items and unequip any other item that might have already
+			// been equipped in that slot
+			ListElement *le = list_head(carriedItems);
+			while (le != NULL) {
+				if (le->data != item) {
+					Equipment *e = (Equipment *)game_object_get_component(le->data, COMP_EQUIPMENT);
+					if (strcmp(e->slot, eq->slot) == 0) {
+						e->isEquipped = false;
+						Combat *cc = (Combat *)game_object_get_component(le->data, COMP_COMBAT);
+						// Apply the effects of unequipping that item
+						playerCombat->toHitModifier -= cc->toHitModifier;
+						playerCombat->attackModifier -= cc->attackModifier;
+						playerCombat->defenseModifier -= cc->defenseModifier;
+						playerCombat->dodgeModifier -= cc->dodgeModifier;
+					}
+				}
+				le = list_next(le);
+			}
+		} else {
+			// Apply the effects of unequipping that item
+			playerCombat->toHitModifier -= c->toHitModifier;
+			playerCombat->attackModifier -= c->attackModifier;
+			playerCombat->defenseModifier -= c->defenseModifier;
+			playerCombat->dodgeModifier -= c->dodgeModifier;
+		}
 	}
 }
 
