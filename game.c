@@ -1250,7 +1250,7 @@ void item_toggle_equip(GameObject *item) {
 			while (le != NULL) {
 				if (le->data != item) {
 					Equipment *e = (Equipment *)game_object_get_component(le->data, COMP_EQUIPMENT);
-					if (strcmp(e->slot, eq->slot) == 0) {
+					if (strcmp(e->slot, eq->slot) == 0 && e->isEquipped) {
 						e->isEquipped = false;
 						Combat *cc = (Combat *)game_object_get_component(le->data, COMP_COMBAT);
 						// Apply the effects of unequipping that item
@@ -1270,6 +1270,53 @@ void item_toggle_equip(GameObject *item) {
 			playerCombat->dodgeModifier -= c->dodgeModifier;
 		}
 	}
+}
+
+void item_drop(GameObject *item) {
+	if (item == NULL) { return; }
+
+	// Determine position of dropped item
+	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+
+	// Check to see if the the item can be dropped
+	List *objects = game_objects_at_position(playerPos->x, playerPos->y);
+	bool canBeDropped = true;
+	ListElement *le = list_head(objects);
+	while (le != NULL) {
+		Equipment *eq = (Equipment *)game_object_get_component(le->data, COMP_EQUIPMENT);
+		if (eq != NULL) {
+			canBeDropped = false;
+			break;
+		}
+		le = list_next(le);
+	}
+
+	if (canBeDropped) {
+		// Drop the item by assigning it a position
+		Position pos = {.objectId = item->id, .x = playerPos->x, .y = playerPos->y, .layer = LAYER_MID};
+		game_object_update_component(item, COMP_POSITION, &pos);
+
+		// Unequip the item if equipped
+		Equipment *eq = (Equipment *)game_object_get_component(item, COMP_EQUIPMENT);
+		if (eq->isEquipped) {
+			item_toggle_equip(item);
+		}
+
+		// Remove from carried items
+		list_remove_element_with_data(carriedItems, item);
+
+		// Display a message to the player
+		Visibility *v = (Visibility *)game_object_get_component(item, COMP_VISIBILITY);
+		char *msg = String_Create("You dropped the %s.", v->name);
+		add_message(msg, 0x990000ff);
+		String_Destroy(msg);
+
+	} else {
+		char *msg = String_Create("Can't drop here.");
+		add_message(msg, 0x990000ff);
+		String_Destroy(msg);
+	}
+
 }
 
 

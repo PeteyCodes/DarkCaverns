@@ -134,9 +134,17 @@ render_inventory_view(Console *console)
 			char *slotStr = String_Create("[%s]", eq->slot);
 			char *itemText = String_Create("%s %-10s %-8s wt: %d", equipped, v->name, slotStr, eq->weight);
 			if (currIdx == highlightedIdx) {
-				console_put_string_at(console, itemText, 6, yIdx, 0xffffffff, 0x80000099);
+				if (eq->isEquipped) {
+					console_put_string_at(console, itemText, 6, yIdx, 0x98FB98ff, 0x80000099);
+				} else {
+					console_put_string_at(console, itemText, 6, yIdx, 0xffffffff, 0x80000099);
+				}
 			} else {
-				console_put_string_at(console, itemText, 6, yIdx, 0x333333ff, 0x00000000);
+				if (eq->isEquipped) {
+					console_put_string_at(console, itemText, 6, yIdx, 0x006400ff, 0x00000000);
+				} else {
+					console_put_string_at(console, itemText, 6, yIdx, 0x333333ff, 0x00000000);
+				}
 			}
 			yIdx += 1;
 		}
@@ -144,7 +152,14 @@ render_inventory_view(Console *console)
 		e = list_next(e);
 	}
 
+	// Render additional information at bottom of view
+	char *weightInfo = String_Create("Carrying: %d  Max: %d", item_get_weight_carried(), maxWeightAllowed);
+	console_put_string_at(console, weightInfo, 10, 23, 0x000044ff, 0x00000000);
 
+	char *instructions = String_Create("[Up/Down] to select item");
+	char *i2 = String_Create("[Spc] to (un)equip, [D] to drop");
+	console_put_string_at(console, instructions, 5, 25, 0x333333ff, 0x00000000);
+	console_put_string_at(console, i2, 5, 26, 0x333333ff, 0x00000000);
 }
 
 internal void 
@@ -392,6 +407,16 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 			}
 			break;
 
+			case SDLK_d: {
+				if (inventoryView != NULL) {
+					ListElement *le = list_item_at(carriedItems, highlightedIdx);
+					if (le != NULL) {
+						item_drop(le->data);
+					}
+				}
+			}
+			break;
+
 			case SDLK_e: {
 				if (inventoryView != NULL) {
 					ListElement *le = list_item_at(carriedItems, highlightedIdx);
@@ -420,6 +445,26 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 				// Player rests
 				health_recover_player_only();
 				playerTookTurn = true;
+			}
+			break;
+
+			case SDLK_SPACE: {
+				// Same as equip
+				if (inventoryView != NULL) {
+					ListElement *le = list_item_at(carriedItems, highlightedIdx);
+					if (le != NULL) {
+						item_toggle_equip(le->data);
+					}
+				}
+			}
+			break;
+
+			case SDLK_ESCAPE: {
+				if (inventoryView != NULL) {
+					hide_inventory_overlay(activeScreen);
+				} else {
+					quit_game();
+				}
 			}
 			break;
 

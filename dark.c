@@ -29,6 +29,9 @@ typedef int32_t		i32;
 typedef int64_t		i64;
 
 
+void quit_game();
+
+
 #define internal static
 #define local_persist static
 #define global_variable static
@@ -71,6 +74,11 @@ render_screen(SDL_Renderer *renderer,
 	SDL_RenderPresent(renderer);
 }
 
+global_variable bool gameIsRunning = true;
+void quit_game() {
+	gameIsRunning = false;
+}
+
 int main(int argc, char *argv[]) 
 {
 
@@ -96,9 +104,7 @@ int main(int argc, char *argv[])
 
 	currentlyInGame = false;
 
-	bool done = false;
-
-	while (!done) {
+	while (gameIsRunning) {
 		playerTookTurn = false;
 
 		SDL_Event event;
@@ -109,7 +115,7 @@ int main(int argc, char *argv[])
 			frameStart = SDL_GetTicks();
 
 			if (event.type == SDL_QUIT) {
-				done = true; 
+				quit_game(); 
 				break;
 			}
 
@@ -118,10 +124,6 @@ int main(int argc, char *argv[])
 				SDL_Keycode key = event.key.keysym.sym;
 
 				switch (key) {
-					case SDLK_ESCAPE:
-						done = true;
-						break;
-
 					case SDLK_t: {
 						asciiMode = !asciiMode;
 					}

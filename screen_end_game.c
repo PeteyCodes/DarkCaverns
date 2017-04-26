@@ -87,8 +87,8 @@ handle_event_endgame(UIScreen *activeScreen, SDL_Event event)
 			}
 			break;
 
-			case SDLK_DOWN: {
-
+			case SDLK_ESCAPE: {
+				quit_game();
 			}
 			break;
 
