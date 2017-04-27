@@ -79,9 +79,8 @@ void quit_game() {
 	gameIsRunning = false;
 }
 
-int main(int argc, char *argv[]) 
+int main() 
 {
-
 	srand((unsigned)time(NULL));
 
 	SDL_Init(SDL_INIT_VIDEO);
