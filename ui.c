@@ -96,7 +96,7 @@ struct UIScreen {
 
 /* UI State */
 global_variable UIScreen *activeScreen = NULL;
-global_variable bool asciiMode = false;
+global_variable bool asciiMode = true;
 
 
 /* 

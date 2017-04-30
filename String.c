@@ -91,6 +91,10 @@ char * String_Trim(char *string);
 //String_Split (return List of strings)
 //String_Join
 
+bool String_Equals(char *string1, char *string2) {
+    return (strcmp(string1, string2) == 0);
+}
+
 int32_t String_Compare(char *string1, char *string2);
 
 bool String_StartsWith(char *string, char *prefix);

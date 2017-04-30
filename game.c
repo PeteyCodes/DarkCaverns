@@ -148,7 +148,9 @@ global_variable List *messageLog = NULL;
 
 /* Necessary function declarations */
 
+void generate_target_map(i32 targetX, i32 targetY);
 void combat_attack(GameObject *attacker, GameObject *defender);
+internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
 internal UIScreen * screen_show_endgame();
 
 
@@ -792,6 +794,16 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 		}
 	}
 	
+	// Place a staircase in a random position in the level
+	GameObject *stairs = game_object_create();
+	Point ptStairs = level_get_open_point(mapCells);
+	Position stairPos = {.objectId = stairs->id, .x = ptStairs.x, .y = ptStairs.y, .layer = LAYER_GROUND};
+	game_object_update_component(stairs, COMP_POSITION, &stairPos);
+	Visibility vis = {.objectId = stairs->id, .glyph = '>', .fgColor = 0xffd700ff, .bgColor = 0x00000000, .visibleOutsideFOV = true, .name="Stairs"};
+	game_object_update_component(stairs, COMP_VISIBILITY, &vis);
+	Physical phys = {.objectId = stairs->id, .blocksMovement = false, .blocksSight = false};
+	game_object_update_component(stairs, COMP_PHYSICAL, &phys);
+
 	// Place our player in a random position in the level
 	Point pt = level_get_open_point(mapCells);
 	Position pos = {.objectId = player->id, .x = pt.x, .y = pt.y, .layer = LAYER_TOP};
@@ -800,7 +812,13 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	return level;
 }
 
-
+void level_descend() {
+	currentLevelNumber += 1;
+	level_init(currentLevelNumber, player);
+	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+	fov_calculate(playerPos->x, playerPos->y, fovMap);
+	generate_target_map(playerPos->x, playerPos->y);
+}
 
 // TODO: Need a level cleanup function 
 
@@ -1165,9 +1183,6 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 }
 
 
-// Necessary forward-declares
-internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
-
 
 /* Item Management routines */
 
@@ -1332,7 +1347,12 @@ void environment_update(Position *playerPos) {
 		Equipment *eqComp = (Equipment *)game_object_get_component(go, COMP_EQUIPMENT);
 		if (eqComp != NULL) {
 			itemObj = go;
-			break;
+		}
+		Visibility *v = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
+		if ((v != NULL) && (String_Equals(v->name, "Stairs"))) {
+			char *msg = String_Create("There are stairs down here. [D]escend?", v->name);
+			add_message(msg, 0xffd700ff);
+			String_Destroy(msg);
 		}
 		e = list_next(e);
 	}
@@ -1358,7 +1378,7 @@ game_new()
 
 	// Create our player
 	player = game_object_create();
-	Visibility vis = {.objectId=player->id, .glyph='@', .fgColor=0x00FF00FF, .bgColor=0x00000000, .hasBeenSeen=true};
+	Visibility vis = {.objectId=player->id, .glyph='@', .fgColor=0x00FF00FF, .bgColor=0x00000000, .hasBeenSeen=true, .name="Player"};
 	game_object_update_component(player, COMP_VISIBILITY, &vis);
 	Physical phys = {player->id, true, true};
 	game_object_update_component(player, COMP_PHYSICAL, &phys);

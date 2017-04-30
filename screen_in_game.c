@@ -227,6 +227,9 @@ render_stats_view(Console *console)
 	console_put_string_at(console, def, 0, 3, 0xe6e600FF, 0x00000000);
 	String_Destroy(def);
 
+	char *level = String_Create("Dungeon Level: %d", currentLevelNumber);
+	console_put_string_at(console, level, 0, 4, 0xffd700ff, 0x00000000);
+	String_Destroy(level);
 }
 
 
@@ -413,6 +416,9 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 					if (le != NULL) {
 						item_drop(le->data);
 					}
+				} else {
+					// Descend to the next level
+					level_descend();
 				}
 			}
 			break;
