@@ -148,6 +148,7 @@ global_variable List *messageLog = NULL;
 
 /* Necessary function declarations */
 
+void add_message(char *msg, u32 color);
 void generate_target_map(i32 targetX, i32 targetY);
 void combat_attack(GameObject *attacker, GameObject *defender);
 internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
@@ -659,7 +660,21 @@ Point level_get_open_point(bool (*mapCells)[MAP_HEIGHT]) {
 		u32 x = rand() % MAP_WIDTH;
 		u32 y = rand() % MAP_HEIGHT;
 		if (mapCells[x][y] == false) {
-			return (Point) {x, y};
+			bool isOccupied = false;
+			List *objs = game_objects_at_position(x, y);
+			ListElement *le = list_head(objs);
+			while (le != NULL) {
+				Equipment *eq = (Equipment *)game_object_get_component(le->data, COMP_EQUIPMENT);
+				Health *h = (Health *)game_object_get_component(le->data, COMP_HEALTH);
+				if ((eq != NULL) || (h != NULL)) { 
+					isOccupied = true;
+					break; 
+				}
+				le = list_next(le);
+			}
+			if (!isOccupied) {
+				return (Point) {x, y};
+			}
 		}
 	}
 }
@@ -814,10 +829,15 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 
 void level_descend() {
 	currentLevelNumber += 1;
-	level_init(currentLevelNumber, player);
+	currentLevel = level_init(currentLevelNumber, player);
 	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 	fov_calculate(playerPos->x, playerPos->y, fovMap);
 	generate_target_map(playerPos->x, playerPos->y);
+
+	char *msg = String_Create("You descend further, and are now on level %d.", currentLevelNumber);
+	add_message("---------------------------------------------------", 0x555555ff);
+	add_message(msg, 0x990000ff);
+	String_Destroy(msg);
 }
 
 // TODO: Need a level cleanup function 
@@ -969,73 +989,79 @@ void movement_update() {
 				}
 			}
 
-			// Determine if we're currently in combat range of the player
-			if ((fovMap[p->x][p->y] > 0) && (targetMap[p->x][p->y] == 1)) {
-				// Combat range - so attack the player
-				combat_attack(&gameObjects[mv->objectId], player);
-
-			} else {
-				// Out of combat range, so determine new position based on our target map
-				if (giveChase) {
-					// Evaluate all cardinal direction cells and pick randomly between optimal moves 
-					Position moves[4];
-					i32 moveCount = 0;
-					i32 currTargetValue = targetMap[p->x][p->y];
-					if (targetMap[p->x - 1][p->y] < currTargetValue) {
-						Position np = newPos;
-						np.x -= 1;	
-						moves[moveCount] = np;					
-						moveCount += 1;
-					}
-					if (targetMap[p->x][p->y - 1] < currTargetValue) { 
-						Position np = newPos;
-						np.y -= 1;						
-						moves[moveCount] = np;					
-						moveCount += 1;
-					}
-					if (targetMap[p->x + 1][p->y] < currTargetValue) { 
-						Position np = newPos;
-						np.x += 1;						
-						moves[moveCount] = np;					
-						moveCount += 1;
-					}
-					if (targetMap[p->x][p->y + 1] < currTargetValue) { 
-						Position np = newPos;
-						np.y += 1;						
-						moves[moveCount] = np;					
-						moveCount += 1;
-					}
-
-					u32 moveIdx = rand() % moveCount;
-					newPos = moves[moveIdx];
+			i32 speedCounter = mv->speed;
+			while (speedCounter > 0) {
+				// Determine if we're currently in combat range of the player
+				if ((fovMap[p->x][p->y] > 0) && (targetMap[p->x][p->y] == 1)) {
+					// Combat range - so attack the player
+					combat_attack(&gameObjects[mv->objectId], player);
 
 				} else {
-					// Move randomly?
-					u32 dir = rand() % 4;
-					switch (dir) {
-						case 0:
-							newPos.x -= 1;
-							break;
-						case 1:
-							newPos.y -= 1;
-							break;
-						case 2:
-							newPos.x += 1;
-							break;
-						default: 
-							newPos.y += 1;
+					// Out of combat range, so determine new position based on our target map
+					if (giveChase) {
+						// Evaluate all cardinal direction cells and pick randomly between optimal moves 
+						Position moves[4];
+						i32 moveCount = 0;
+						i32 currTargetValue = targetMap[p->x][p->y];
+						if (targetMap[p->x - 1][p->y] < currTargetValue) {
+							Position np = newPos;
+							np.x -= 1;	
+							moves[moveCount] = np;					
+							moveCount += 1;
+						}
+						if (targetMap[p->x][p->y - 1] < currTargetValue) { 
+							Position np = newPos;
+							np.y -= 1;						
+							moves[moveCount] = np;					
+							moveCount += 1;
+						}
+						if (targetMap[p->x + 1][p->y] < currTargetValue) { 
+							Position np = newPos;
+							np.x += 1;						
+							moves[moveCount] = np;					
+							moveCount += 1;
+						}
+						if (targetMap[p->x][p->y + 1] < currTargetValue) { 
+							Position np = newPos;
+							np.y += 1;						
+							moves[moveCount] = np;					
+							moveCount += 1;
+						}
+
+						if (moveCount > 0) {
+							u32 moveIdx = rand() % moveCount;
+							newPos = moves[moveIdx];
+						}
+
+					} else {
+						// Move randomly?
+						u32 dir = rand() % 4;
+						switch (dir) {
+							case 0:
+								newPos.x -= 1;
+								break;
+							case 1:
+								newPos.y -= 1;
+								break;
+							case 2:
+								newPos.x += 1;
+								break;
+							default: 
+								newPos.y += 1;
+						}
+					}
+
+					// Test to see if the new position can be moved to
+					if (can_move(newPos)) {
+						game_object_update_component(&gameObjects[mv->objectId], COMP_POSITION, &newPos);
+						mv->ticksUntilNextMove = mv->frequency;				
+					} else {
+						mv->ticksUntilNextMove += 1;
 					}
 				}
 
-				// Test to see if the new position can be moved to
-				if (can_move(newPos)) {
-					game_object_update_component(&gameObjects[mv->objectId], COMP_POSITION, &newPos);
-					mv->ticksUntilNextMove = mv->frequency;				
-				} else {
-					mv->ticksUntilNextMove += 1;
-				}
+				speedCounter -= 1;
 			}
-
 		}
 
 		e = list_next(e);
