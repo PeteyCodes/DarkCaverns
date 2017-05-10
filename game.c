@@ -13,6 +13,7 @@
 #define MONSTER_TYPE_COUNT	100
 #define ITEM_TYPE_COUNT		100
 #define MAX_DUNGEON_LEVEL	20
+#define GEMS_PER_LEVEL		5
 
 typedef enum {
 	COMP_POSITION = 0,
@@ -22,6 +23,7 @@ typedef enum {
 	COMP_MOVEMENT,
 	COMP_COMBAT,
 	COMP_EQUIPMENT,
+	COMP_TREASURE,
 
 	/* Define other components above here */
 	COMPONENT_COUNT
@@ -96,6 +98,10 @@ typedef struct {
 	bool isEquipped;
 } Equipment;
 
+typedef struct {
+	i32 objectId;
+	i32 value;
+} Treasure;
 
 /* Level Support */
 
@@ -123,9 +129,13 @@ global_variable List *movementComps;
 global_variable List *healthComps;
 global_variable List *combatComps;
 global_variable List *equipmentComps;
+global_variable List *treasureComps;
 
 global_variable List *carriedItems;
 global_variable i32 maxWeightAllowed = 20;
+
+global_variable i32 gemsFoundThisLevel = 0;
+global_variable i32 gemsFoundTotal = 0;
 
 global_variable bool currentlyInGame = false;
 global_variable	bool recalculateFOV = false;
@@ -238,6 +248,7 @@ void world_state_init() {
 	healthComps = list_new(free);
 	combatComps = list_new(free);
 	equipmentComps = list_new(free);
+	treasureComps = list_new(free);
 
 	carriedItems = list_new(free);
 
@@ -546,6 +557,36 @@ void game_object_update_component(GameObject *obj,
 			break;
 		}
 
+		case COMP_TREASURE: {
+			if (compData != NULL) {
+				Treasure *treas = obj->components[COMP_TREASURE];
+				bool addedNew = false;
+				if (treas == NULL) {
+					treas = (Treasure *)malloc(sizeof(Treasure));
+					addedNew = true;
+				}
+
+				Treasure *treasData = (Treasure *)compData;
+				treas->objectId = obj->id;
+				treas->value = treasData->value;
+
+				if (addedNew) {
+					list_insert_after(treasureComps, NULL, treas);				
+				}
+				obj->components[comp] = treas;
+				
+			} else {
+				// Clear component 
+				Treasure *t = obj->components[COMP_TREASURE];
+				if (t != NULL) {
+					list_remove_element_with_data(treasureComps, t);				
+				}
+				obj->components[comp] = NULL;				
+			}
+
+			break;
+		}
+
 		default:
 			assert(1 == 0);
 	}
@@ -573,6 +614,9 @@ void game_object_destroy(GameObject *obj) {
 
 	elementToRemove = list_search(equipmentComps, obj->components[COMP_EQUIPMENT]);
 	if (elementToRemove != NULL ) { list_remove(equipmentComps, elementToRemove); }
+
+	elementToRemove = list_search(treasureComps, obj->components[COMP_TREASURE]);
+	if (elementToRemove != NULL ) { list_remove(treasureComps, elementToRemove); }
 
 	// TODO: Clean up other components used by this object
 
@@ -666,7 +710,8 @@ Point level_get_open_point(bool (*mapCells)[MAP_HEIGHT]) {
 			while (le != NULL) {
 				Equipment *eq = (Equipment *)game_object_get_component(le->data, COMP_EQUIPMENT);
 				Health *h = (Health *)game_object_get_component(le->data, COMP_HEALTH);
-				if ((eq != NULL) || (h != NULL)) { 
+				Treasure *t = (Treasure *)game_object_get_component(le->data, COMP_TREASURE);
+				if ((eq != NULL) || (h != NULL) || (t != NULL)) { 
 					isOccupied = true;
 					break; 
 				}
@@ -809,6 +854,21 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 		}
 	}
 	
+	// Place gems in random positions around the level
+	gemsFoundThisLevel = 0;
+	for (i32 i = 0; i < GEMS_PER_LEVEL; i++) {
+		GameObject *gem = game_object_create();
+		Point ptGem = level_get_open_point(mapCells);
+		Position gemPos = {.objectId = gem->id, .x = ptGem.x, .y = ptGem.y, .layer = LAYER_GROUND};
+		game_object_update_component(gem, COMP_POSITION, &gemPos);
+		Visibility vis = {.objectId = gem->id, .glyph = '$', .fgColor = 0x753aabff, .bgColor = 0x00000000, .visibleOutsideFOV = false, .name="Gem"};
+		game_object_update_component(gem, COMP_VISIBILITY, &vis);
+		Physical phys = {.objectId = gem->id, .blocksMovement = false, .blocksSight = false};
+		game_object_update_component(gem, COMP_PHYSICAL, &phys);
+		Treasure treas = {.objectId = gem->id, .value = 1};
+		game_object_update_component(gem, COMP_TREASURE, &treas);
+	}
+
 	// Place a staircase in a random position in the level
 	GameObject *stairs = game_object_create();
 	Point ptStairs = level_get_open_point(mapCells);
@@ -1232,6 +1292,7 @@ void item_get() {
 	List *objects = game_objects_at_position(playerPos->x, playerPos->y);
 	GameObject *itemObj = NULL;
 	Equipment *eq = NULL;
+	Treasure *t = NULL;
 	ListElement *e = list_head(objects);
 	while (e != NULL) {
 		GameObject *go = (GameObject *)list_data(e);
@@ -1240,8 +1301,30 @@ void item_get() {
 			itemObj = go;
 			break;
 		}
+		t = (Treasure *)game_object_get_component(go, COMP_TREASURE);
+		if (t != NULL) {
+			itemObj = go;
+			break;
+		}
 		e = list_next(e);
 	}
+
+	if (itemObj != NULL && t != NULL) {
+		gemsFoundThisLevel += 1;
+		gemsFoundTotal += 1;
+
+		Visibility *v = (Visibility *)game_object_get_component(itemObj, COMP_VISIBILITY);
+		if (v != NULL) {
+			char *msg = String_Create("You picked up the %s. Gems left on level:%d", v->name, GEMS_PER_LEVEL - gemsFoundThisLevel);
+			add_message(msg, 0x753aabff);
+			String_Destroy(msg);
+		}
+
+		// Destroy the gem game object - we don't need it anymore.
+		game_object_update_component(itemObj, COMP_POSITION, NULL);		// remove it from position tracking lists
+		game_object_destroy(itemObj);
+	}
+
 	if (itemObj != NULL && eq != NULL) {
 		// Can the player pick it up (are they carrying too much already?)
 		i32 carriedWeight = item_get_weight_carried();
@@ -1266,7 +1349,6 @@ void item_get() {
 			add_message(msg, 0x990000ff);
 			String_Destroy(msg);
 		}
-
 	}
 }
 
@@ -1372,6 +1454,10 @@ void environment_update(Position *playerPos) {
 		GameObject *go = (GameObject *)list_data(e);
 		Equipment *eqComp = (Equipment *)game_object_get_component(go, COMP_EQUIPMENT);
 		if (eqComp != NULL) {
+			itemObj = go;
+		}
+		Treasure *trComp = (Treasure *)game_object_get_component(go, COMP_TREASURE);
+		if (trComp != NULL) {
 			itemObj = go;
 		}
 		Visibility *v = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);

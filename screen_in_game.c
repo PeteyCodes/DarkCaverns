@@ -219,17 +219,22 @@ render_stats_view(Console *console)
 	}
 
 	Combat *playerCombat = game_object_get_component(player, COMP_COMBAT);
-	char *att = String_Create("ATT: %d (%d)", playerCombat->attack, playerCombat->attackModifier);
+	char *att = String_Create("ATT:%d (%d)", playerCombat->attack, playerCombat->attackModifier);
 	console_put_string_at(console, att, 0, 2, 0xe6e600FF, 0x00000000);
 	String_Destroy(att);
 
-	char *def = String_Create("DEF: %d (%d)", playerCombat->defense, playerCombat->defenseModifier);
+	char *def = String_Create("DEF:%d (%d)", playerCombat->defense, playerCombat->defenseModifier);
 	console_put_string_at(console, def, 0, 3, 0xe6e600FF, 0x00000000);
 	String_Destroy(def);
 
-	char *level = String_Create("Dungeon Level: %d", currentLevelNumber);
+	char *level = String_Create("Level:%d", currentLevelNumber);
 	console_put_string_at(console, level, 0, 4, 0xffd700ff, 0x00000000);
 	String_Destroy(level);
+
+	char *gems = String_Create("Gems:%d", gemsFoundTotal);
+	console_put_string_at(console, gems, 10, 4, 0x753aabff, 0x00000000);
+	String_Destroy(gems);
+
 }
 
 
