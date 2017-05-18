@@ -271,6 +271,12 @@ void world_state_init() {
 		get_max_counts(levelEntity, "max_items", maxItems);
 	}
 
+	// Clear our message log if necessary
+	if (messageLog != NULL) {
+		list_destroy(messageLog);
+		messageLog = NULL;
+	}
+	
 	// TODO: Other one-time data generation using config data?
 
 }
@@ -806,7 +812,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			Point pt = level_get_open_point(mapCells);
 			char *name = config_entity_value(monsterEntity, "name");
 			char *glyph = config_entity_value(monsterEntity, "vis_glyph");
-			asciiChar g = *glyph;
+			asciiChar g = atoi(glyph);
 			char *color = config_entity_value(monsterEntity, "vis_color");
 			u32 c = xtoi(color);
 			char *speed = config_entity_value(monsterEntity, "mv_speed");
@@ -837,7 +843,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			Point pt = level_get_open_point(mapCells);
 			char *name = config_entity_value(entity, "name");
 			char *glyph = config_entity_value(entity, "vis_glyph");
-			asciiChar g = *glyph;
+			asciiChar g = atoi(glyph);
 			char *color = config_entity_value(entity, "vis_color");
 			u32 c = xtoi(color);
 
@@ -861,7 +867,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 		Point ptGem = level_get_open_point(mapCells);
 		Position gemPos = {.objectId = gem->id, .x = ptGem.x, .y = ptGem.y, .layer = LAYER_GROUND};
 		game_object_update_component(gem, COMP_POSITION, &gemPos);
-		Visibility vis = {.objectId = gem->id, .glyph = '$', .fgColor = 0x753aabff, .bgColor = 0x00000000, .visibleOutsideFOV = false, .name="Gem"};
+		Visibility vis = {.objectId = gem->id, .glyph = 4, .fgColor = 0x753aabff, .bgColor = 0x00000000, .visibleOutsideFOV = false, .name="Gem"};
 		game_object_update_component(gem, COMP_VISIBILITY, &vis);
 		Physical phys = {.objectId = gem->id, .blocksMovement = false, .blocksSight = false};
 		game_object_update_component(gem, COMP_PHYSICAL, &phys);

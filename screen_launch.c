@@ -11,13 +11,16 @@
 #define MENU_LEFT	50
 #define MENU_TOP	28
 #define MENU_WIDTH	24
-#define MENU_HEIGHT	13
+#define MENU_HEIGHT	10
 
 
 
 internal void render_bg_view(Console *console);
 internal void render_menu_view(Console *console);
 internal void handle_event_launch(UIScreen *activeScreen, SDL_Event event);
+
+// Forward declares for other screens
+internal UIScreen * screen_show_hof();
 
 
 // Init / Show screen --
@@ -75,8 +78,7 @@ render_menu_view(Console *console)
 	view_draw_rect(console, &rect, 0x363247FF, 0, 0xFFFFFFFF);
 
 	console_put_string_at(console, "Start a (N)ew game", 2, 3, 0xbca285FF, 0x00000000);
-	console_put_string_at(console, "(L)oad a saved game", 2, 6, 0xbca285FF, 0x00000000);
-	console_put_string_at(console, "Show (C)redits", 2, 9, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "View (H)all of Fame", 2, 6, 0xbca285FF, 0x00000000);
 }
 
 
@@ -95,6 +97,12 @@ handle_event_launch(UIScreen *activeScreen, SDL_Event event)
 				game_new();
 				ui_set_active_screen(screen_show_in_game());
 				currentlyInGame = true;
+			}
+			break;
+
+			case SDLK_h: {
+				// Show hall of fame / credits screen
+				ui_set_active_screen(screen_show_hof());
 			}
 			break;
 

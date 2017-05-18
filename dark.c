@@ -50,6 +50,7 @@ void quit_game();
 // Screen files
 #include "screen_in_game.c"
 #include "screen_launch.c"
+#include "screen_hof.c"
 #include "screen_end_game.c"
 
 

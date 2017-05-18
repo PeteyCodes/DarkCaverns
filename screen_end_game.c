@@ -68,7 +68,26 @@ render_endgame_bg_view(Console *console)
 internal void 
 render_info_view(Console *console)  
 {
-	// TODO
+	// Stats recap
+	console_put_string_at(console, "-== HERO STATS ==-", 8, 0, 0xffd700ff, 0x00000000);
+
+	char *level = String_Create("Level:%d", currentLevelNumber);
+	console_put_string_at(console, level, 9, 3, 0xffd700ff, 0x00000000);
+	String_Destroy(level);
+
+	char *gems = String_Create("Gems:%d", gemsFoundTotal);
+	console_put_string_at(console, gems, 19, 3, 0x753aabff, 0x00000000);
+	String_Destroy(gems);
+
+	// Leaderboard
+	console_put_string_at(console, "-== HERO HALL OF FAME ==-", 5, 7, 0xaa0000ff, 0x00000000);
+	console_put_string_at(console, "Coming Soon!", 11, 9, 0x555555ff, 0x00000000);
+	// TODO: leaderboard
+
+	// Instructions for active commands
+	console_put_string_at(console, "Start a (N)ew game", 8, 27, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "-or-", 15, 28, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "(ESC) to Quit", 10, 29, 0xbca285FF, 0x00000000);
 }
 
 
@@ -83,7 +102,10 @@ handle_event_endgame(UIScreen *activeScreen, SDL_Event event)
 
 		switch (key) {
 			case SDLK_n: {
-				// TODO
+				// Start a new game and transition to in-game screen
+				game_new();
+				ui_set_active_screen(screen_show_in_game());
+				currentlyInGame = true;
 			}
 			break;
 
