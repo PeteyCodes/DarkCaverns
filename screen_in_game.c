@@ -201,6 +201,11 @@ render_stats_view(Console *console)
 	UIRect rect = {0, 0, STATS_WIDTH, STATS_HEIGHT};
 	view_draw_rect(console, &rect, 0x222222FF, 0, 0xFF990099);
 
+	// Player name
+	if (playerName != NULL) {
+		console_put_string_at(console, playerName, 0, 0, 0xffffffff, 0x00000000);
+	}
+
 	// HP health bar
 	Health *playerHealth = game_object_get_component(player, COMP_HEALTH);
 	console_put_char_at(console, 'H', 0, 1, 0xFF990099, 0x00000000);

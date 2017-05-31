@@ -121,6 +121,7 @@ typedef struct {
 /* Game State */
 #define MAX_GO 	10000
 global_variable GameObject *player = NULL;
+global_variable char* playerName = NULL;
 global_variable GameObject gameObjects[MAX_GO];
 global_variable List *positionComps;
 global_variable List *visibilityComps;
@@ -1504,6 +1505,8 @@ game_new()
 	game_object_update_component(player, COMP_HEALTH, &hlth);
 	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .dodgeModifier = 0};
 	game_object_update_component(player, COMP_COMBAT, &com);
+
+	playerName = name_create();
 
 	// Create a level and place our player in it
 	currentLevelNumber = 1;

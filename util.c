@@ -2,6 +2,29 @@
  * util.c - Miscellaneous utility fns
  */
 
+// Forward declares
+char * String_Create(const char *, ...);
+
+
+#define PREFIX_COUNT 10
+#define SUFFIX_COUNT 10
+
+char *fnamePrefix[] = {"Gar","Ben","Arg","Tar","Mar","Gen","Zor","Raf","Bur","Kor"};
+char *fnameSuffix[] = {"ath","amm","erth","ogan","'ul","ew","xor","tar","ith","elon"};
+char *lnamePrefix[] = {"Sword","Axe","Stone","Gold","Light","Warg","Pike","Star","Moon","Sun"};
+char *lnameSuffix[] = {"bringer","crusher","smith","slinger","smiter","hexer","caster","rider","horn","grinder"};
+
+char * name_create() {
+	i32 idx1 = rand() % PREFIX_COUNT;
+	i32 idx2 = rand() % SUFFIX_COUNT;
+	i32 idx3 = rand() % PREFIX_COUNT;
+	i32 idx4 = rand() % SUFFIX_COUNT;
+	char *name = String_Create("%s%s %s%s", fnamePrefix[idx1], fnameSuffix[idx2], 
+											lnamePrefix[idx3], lnameSuffix[idx4]);
+
+	return name;
+}
+
 
 /* Determine the endianness of the system we're running on. */
 bool system_is_little_endian() {

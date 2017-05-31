@@ -71,12 +71,14 @@ render_info_view(Console *console)
 	// Stats recap
 	console_put_string_at(console, "-== HERO STATS ==-", 8, 0, 0xffd700ff, 0x00000000);
 
+	console_put_string_at(console, playerName, 9, 2, 0xffffffff, 0x00000000);
+
 	char *level = String_Create("Level:%d", currentLevelNumber);
-	console_put_string_at(console, level, 9, 3, 0xffd700ff, 0x00000000);
+	console_put_string_at(console, level, 9, 4, 0xffd700ff, 0x00000000);
 	String_Destroy(level);
 
 	char *gems = String_Create("Gems:%d", gemsFoundTotal);
-	console_put_string_at(console, gems, 19, 3, 0x753aabff, 0x00000000);
+	console_put_string_at(console, gems, 19, 4, 0x753aabff, 0x00000000);
 	String_Destroy(gems);
 
 	// Leaderboard
