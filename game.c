@@ -118,6 +118,15 @@ typedef struct {
 } Message;
 
 
+/* Hall of Fame */
+typedef struct {
+	char *name;
+	i32 level;
+	i32 gems;
+	char *date;
+} HOFRecord;
+
+
 /* Game State */
 #define MAX_GO 	10000
 global_variable GameObject *player = NULL;
@@ -155,7 +164,7 @@ global_variable Config *levelConfig = NULL;
 global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
 global_variable i32 maxItems[MAX_DUNGEON_LEVEL];
 global_variable List *messageLog = NULL;
-
+global_variable Config *hofConfig = NULL;
 
 /* Necessary function declarations */
 
@@ -164,6 +173,7 @@ void generate_target_map(i32 targetX, i32 targetY);
 void combat_attack(GameObject *attacker, GameObject *defender);
 internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
 internal UIScreen * screen_show_endgame();
+internal void game_over();
 
 
 
@@ -1148,6 +1158,7 @@ void health_check_death(GameObject *go) {
 			char *msg = String_Create("You have died.");
 			add_message(msg, 0xCC0000FF);
 			String_Destroy(msg);
+			game_over();
 			ui_set_active_screen(screen_show_endgame());
 		
 		} else {
@@ -1538,6 +1549,64 @@ game_update()
 		recalculateFOV = false;
 	}
 
+}
+
+internal void
+game_over() {
+	// Do endgame processing -- 
+
+/*
+	// Load the existing HoF data if necessary
+	if (hofConfig == NULL) {
+		hofConfig = config_file_parse("hof.cfg");
+	}
+
+	// Determine if current game makes the HoF
+	ListElement *e = list_head(hofConfig->entities);
+	bool hofUpdated = false;
+	while (e != NULL) {
+		ConfigEntity *entity = (ConfigEntity *)e->data;
+		char *gems = config_entity_value(entity, "gems");
+		i32 gemCount = atoi(gems);
+
+		// If current game's score is higher than entry score, it made the list
+		if (gemsFoundTotal >= gemCount) {
+			// Create a new config entity and load it up with this game's data
+			ConfigEntity *newEntity = (ConfigEntity *)malloc(sizeof(newEntity));
+			new_entity->name = String_Create("%s", "RECORD");
+			config_entity_set_value(newEntity, "name", playerName);
+			config_entity_set_value(newEntity, "level", playerName);
+			newEntity->level = String_Create("%d", currentLevelNumber);
+			newEntity->gems = String_Create("%d", gemsFoundTotal);
+
+			time_t rawTime;
+			time(&rawTime);
+			struct tm today = localtime(&rawTime);
+			newEntity->date = String_Create("%d/%d/%d", tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900);
+
+			// Insert an element containing new entity before the element 
+			// with the entity we're comparing to
+			list_insert_after(hofConfig->entities, list_prev(e), newEntity);
+			hofUpdated = true;
+			break;
+		}
+
+		e = list_next(e);
+	}
+
+	// Check if the HoF contains more than 10 entries. If so, cull the list.
+	if (list_size(hofConfig->entities) > 10) {
+		ListElement *le = list_item_at(hofConfig->entities, 10);
+		if (le != NULL) {
+			list_remove(hofConfig->entities, le);
+		}
+	}
+
+	// If we updated the HoF, write the new data to file
+	if (hofUpdated) {
+		// TODO - Persist HoF to config file
+	}
+	*/
 }
 
 

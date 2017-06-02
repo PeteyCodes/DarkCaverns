@@ -100,4 +100,8 @@ char * config_entity_value(ConfigEntity *entity, char *key) {
 	return NULL;
 }
 
+void config_entity_set_value(ConfigEntity *entity, char *key, char *value) {
+	// TODO - add a new key-value pair to the entity
+}
+
 

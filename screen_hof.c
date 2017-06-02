@@ -31,11 +31,37 @@ screen_show_hof()
 	hofScreen->activeView = bgView;
 	hofScreen->handle_event = handle_event_hof;
 
+	if (hofConfig == NULL) {
+		hofConfig = config_file_parse("hof.cfg");
+	}
+
 	return hofScreen;
 }
 
 
 // Render Functions -- 
+
+internal void
+render_hof_entries(Console *console) {
+
+	// Loop through all HoF entries, extract the data into a formatted string, and write to screen
+	i32 y = 10;
+	ListElement *e = list_head(hofConfig->entities);
+	while (e != NULL) {
+		ConfigEntity *entity = (ConfigEntity *)e->data;
+
+		char *name = config_entity_value(entity, "name");
+		char *level = config_entity_value(entity, "level");
+		char *gems = config_entity_value(entity, "gems");
+		char *date = config_entity_value(entity, "date");
+
+		char *recordString = String_Create("%s %s Level:%s Gems:%s", name, date, level, gems);
+		console_put_string_at(console, recordString, 18, y, 0xeeeeeeff, 0x00000000);
+
+		y += 1;
+		e = list_next(e);
+	}
+}
 
 internal void 
 render_hof_bg_view(Console *console)  
@@ -58,6 +84,8 @@ render_hof_bg_view(Console *console)
 	view_draw_rect(console, &rect, 0x363247dd, 2, 0xaad700ff);
 
 	console_put_string_at(console, "-== HALL OF FAME ==-", 30, 7, 0xaad700ff, 0x00000000);
+
+	render_hof_entries(console);
 
     console_put_string_at(console, "-== CREDITS ==-", 33, 32, 0xaad700ff, 0x00000000);
 
