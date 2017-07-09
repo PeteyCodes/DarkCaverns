@@ -280,14 +280,22 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 
 		switch (key) {
 			// DEBUG
-			case SDLK_m:
+			case SDLK_m: {
 				// Restart a new level with a new map
 				level_init(currentLevelNumber, player);
 				playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 				fov_calculate(playerPos->x, playerPos->y, fovMap);
 				generate_target_map(playerPos->x, playerPos->y);
+			}
+			break;
 
-				break;
+			case SDLK_x: {
+				game_over();
+				ui_set_active_screen(screen_show_endgame());	
+			}
+			break;
+
+
 			// END DEBUG
 
 			case SDLK_UP: {

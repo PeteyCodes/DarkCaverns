@@ -53,7 +53,7 @@ Config * config_file_parse(char * filename) {
 				strcpy(copy, entityName);
 				entity->name = copy;
 				entity->keyValuePairs = list_new(free);
-				list_insert_after(cfg->entities, NULL, entity);
+				list_insert_after(cfg->entities, list_tail(cfg->entities), entity);
 				currentEntity = entity;
 
 			} else if ((buffer[0] != '\n') && (buffer[0] != ' ')) {
@@ -70,7 +70,7 @@ Config * config_file_parse(char * filename) {
 					strcpy(copyValue, value);
 					kv->value = copyValue;
 
-					list_insert_after(currentEntity->keyValuePairs, NULL, kv);					
+					list_insert_after(currentEntity->keyValuePairs, list_tail(currentEntity->keyValuePairs), kv);					
 				}
 
 			} else {
@@ -101,7 +101,38 @@ char * config_entity_value(ConfigEntity *entity, char *key) {
 }
 
 void config_entity_set_value(ConfigEntity *entity, char *key, char *value) {
-	// TODO - add a new key-value pair to the entity
+	// Add a new key-value pair to the entity
+
+	if (entity->keyValuePairs == NULL) {
+		entity->keyValuePairs = list_new(free);
+	}
+
+	ConfigKeyValuePair *kv = malloc(sizeof(ConfigKeyValuePair));
+	kv->key = strdup(key);
+	kv->value = strdup(value);
+
+	list_insert_after(entity->keyValuePairs, list_tail(entity->keyValuePairs), kv);
 }
 
+void config_file_write(char *filename, Config *config) {
 
+	FILE * configFile = fopen(filename, "w");
+	if (configFile) {
+		ListElement *e = list_head(config->entities);
+		while (e != NULL) {
+			ConfigEntity *entity = (ConfigEntity *)e->data;
+			fprintf(configFile, "[%s]\n", entity->name);
+
+			ListElement *le = list_head(entity->keyValuePairs);
+			while (le != NULL) {
+				ConfigKeyValuePair *kv = (ConfigKeyValuePair *)le->data;
+				fprintf(configFile, "%s=%s\n", kv->key, kv->value);
+
+				le = list_next(le);
+			}
+
+			e = list_next(e);
+		}
+	}
+	fclose(configFile);
+}

@@ -8,9 +8,9 @@
 #define ENDGAME_BG_WIDTH	80
 #define ENDGAME_BG_HEIGHT	45
 
-#define INFO_LEFT	10
+#define INFO_LEFT	2
 #define INFO_TOP	10
-#define INFO_WIDTH	30
+#define INFO_WIDTH	50
 #define INFO_HEIGHT	30
 
 
@@ -40,6 +40,10 @@ screen_show_endgame()
 	endScreen->views = subViews;
 	endScreen->activeView = infoView;
 	endScreen->handle_event = handle_event_endgame;
+
+	if (hofConfig == NULL) {
+		hofConfig = config_file_parse("hof.cfg");
+	}
 
 	return endScreen;
 }
@@ -83,8 +87,23 @@ render_info_view(Console *console)
 
 	// Leaderboard
 	console_put_string_at(console, "-== HERO HALL OF FAME ==-", 5, 7, 0xaa0000ff, 0x00000000);
-	console_put_string_at(console, "Coming Soon!", 11, 9, 0x555555ff, 0x00000000);
-	// TODO: leaderboard
+	// Loop through all HoF entries, extract the data into a formatted string, and write to screen
+	i32 y = 9;
+	ListElement *e = list_head(hofConfig->entities);
+	while (e != NULL) {
+		ConfigEntity *entity = (ConfigEntity *)e->data;
+
+		char *name = config_entity_value(entity, "name");
+		char *level = config_entity_value(entity, "level");
+		char *gems = config_entity_value(entity, "gems");
+		char *date = config_entity_value(entity, "date");
+
+		char *recordString = String_Create("%s %s Level:%s Gems:%s", name, date, level, gems);
+		console_put_string_at(console, recordString, 3, y, 0xeeeeeeff, 0x00000000);
+
+		y += 2;
+		e = list_next(e);
+	}
 
 	// Instructions for active commands
 	console_put_string_at(console, "Start a (N)ew game", 8, 27, 0xbca285FF, 0x00000000);

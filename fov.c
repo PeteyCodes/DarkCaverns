@@ -109,14 +109,14 @@ bool cell_blocks_sight(u32 x, u32 y) {
 		ListElement *e = list_head(gos);
 		while (e != NULL) {
 			GameObject *go = (GameObject *)list_data(e);
-			Physical *phys = (Physical *)game_object_get_component(go, COMP_PHYSICAL);
-			if (phys->blocksSight) {
-				return true;
+			if (go->id != UNUSED) {
+				Physical *phys = (Physical *)game_object_get_component(go, COMP_PHYSICAL);
+				if (phys->blocksSight) {
+					return true;
+				}
 			}
-
 			e = list_next(e);
 		}
-
 	}
 
 	return false;

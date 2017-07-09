@@ -2,6 +2,8 @@
 * game.c
 */
 
+#include <time.h>
+
 #define UNUSED	-1
 
 #define LAYER_UNSET		0
@@ -1555,7 +1557,6 @@ internal void
 game_over() {
 	// Do endgame processing -- 
 
-/*
 	// Load the existing HoF data if necessary
 	if (hofConfig == NULL) {
 		hofConfig = config_file_parse("hof.cfg");
@@ -1564,34 +1565,57 @@ game_over() {
 	// Determine if current game makes the HoF
 	ListElement *e = list_head(hofConfig->entities);
 	bool hofUpdated = false;
+
 	while (e != NULL) {
 		ConfigEntity *entity = (ConfigEntity *)e->data;
 		char *gems = config_entity_value(entity, "gems");
 		i32 gemCount = atoi(gems);
 
-		// If current game's score is higher than entry score, it made the list
+		// If the current game's score is higher than this entry's score, it made the list right here
 		if (gemsFoundTotal >= gemCount) {
 			// Create a new config entity and load it up with this game's data
-			ConfigEntity *newEntity = (ConfigEntity *)malloc(sizeof(newEntity));
-			new_entity->name = String_Create("%s", "RECORD");
+			ConfigEntity *newEntity = (ConfigEntity *)malloc(sizeof(ConfigEntity));
+			newEntity->name = String_Create("%s", "RECORD");
 			config_entity_set_value(newEntity, "name", playerName);
-			config_entity_set_value(newEntity, "level", playerName);
-			newEntity->level = String_Create("%d", currentLevelNumber);
-			newEntity->gems = String_Create("%d", gemsFoundTotal);
+			config_entity_set_value(newEntity, "gems", String_Create("%d", gemsFoundTotal));
+			config_entity_set_value(newEntity, "level", String_Create("%d", currentLevelNumber));
 
 			time_t rawTime;
 			time(&rawTime);
-			struct tm today = localtime(&rawTime);
-			newEntity->date = String_Create("%d/%d/%d", tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900);
+			struct tm *today = localtime(&rawTime);
+			config_entity_set_value(newEntity, "date", String_Create("%d/%d/%d", today->tm_mon + 1, today->tm_mday, today->tm_year + 1900));
 
 			// Insert an element containing new entity before the element 
 			// with the entity we're comparing to
-			list_insert_after(hofConfig->entities, list_prev(e), newEntity);
+			ListElement *insertAfterThis = list_prev(e);
+			if (insertAfterThis == NULL) { insertAfterThis = list_tail(hofConfig->entities); }
+			list_insert_after(hofConfig->entities, insertAfterThis, newEntity);
 			hofUpdated = true;
 			break;
 		}
 
 		e = list_next(e);
+	}
+
+	// If the current game doesn't rank higher than other games in the HoF, but the
+	// HoF contains fewer than 10 entries, add this game to the end.
+	if ((!hofUpdated) && (list_size(hofConfig->entities) < 10)) {
+		// Create a new config entity and load it up with this game's data
+		ConfigEntity *newEntity = (ConfigEntity *)malloc(sizeof(ConfigEntity));
+		newEntity->name = String_Create("%s", "RECORD");
+		config_entity_set_value(newEntity, "name", playerName);
+		config_entity_set_value(newEntity, "gems", String_Create("%d", gemsFoundTotal));
+		config_entity_set_value(newEntity, "level", String_Create("%d", currentLevelNumber));
+
+		time_t rawTime;
+		time(&rawTime);
+		struct tm *today = localtime(&rawTime);
+		config_entity_set_value(newEntity, "date", String_Create("%d/%d/%d", today->tm_mon + 1, today->tm_mday, today->tm_year + 1900));
+
+		// Insert an element containing new entity before the element 
+		// with the entity we're comparing to
+		list_insert_after(hofConfig->entities, list_tail(hofConfig->entities), newEntity);
+		hofUpdated = true;
 	}
 
 	// Check if the HoF contains more than 10 entries. If so, cull the list.
@@ -1604,9 +1628,9 @@ game_over() {
 
 	// If we updated the HoF, write the new data to file
 	if (hofUpdated) {
-		// TODO - Persist HoF to config file
+		// Persist HoF to config file
+		config_file_write("hof.cfg", hofConfig);
 	}
-	*/
 }
 
 
