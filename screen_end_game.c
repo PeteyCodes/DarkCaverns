@@ -11,7 +11,7 @@
 #define INFO_LEFT	2
 #define INFO_TOP	10
 #define INFO_WIDTH	50
-#define INFO_HEIGHT	30
+#define INFO_HEIGHT	35
 
 
 internal void render_endgame_bg_view(Console *console);
@@ -73,20 +73,20 @@ internal void
 render_info_view(Console *console)  
 {
 	// Stats recap
-	console_put_string_at(console, "-== HERO STATS ==-", 8, 0, 0xffd700ff, 0x00000000);
+	console_put_string_at(console, "-== HERO STATS ==-", 17, 0, 0xffd700ff, 0x00000000);
 
-	console_put_string_at(console, playerName, 9, 2, 0xffffffff, 0x00000000);
+	console_put_string_at(console, playerName, 18, 2, 0xffffffff, 0x00000000);
 
 	char *level = String_Create("Level:%d", currentLevelNumber);
-	console_put_string_at(console, level, 9, 4, 0xffd700ff, 0x00000000);
+	console_put_string_at(console, level, 18, 4, 0xffd700ff, 0x00000000);
 	String_Destroy(level);
 
 	char *gems = String_Create("Gems:%d", gemsFoundTotal);
-	console_put_string_at(console, gems, 19, 4, 0x753aabff, 0x00000000);
+	console_put_string_at(console, gems, 28, 4, 0x753aabff, 0x00000000);
 	String_Destroy(gems);
 
 	// Leaderboard
-	console_put_string_at(console, "-== HERO HALL OF FAME ==-", 5, 7, 0xaa0000ff, 0x00000000);
+	console_put_string_at(console, "-== HERO HALL OF FAME ==-", 14, 7, 0xaa0000ff, 0x00000000);
 	// Loop through all HoF entries, extract the data into a formatted string, and write to screen
 	i32 y = 9;
 	ListElement *e = list_head(hofConfig->entities);
@@ -98,17 +98,19 @@ render_info_view(Console *console)
 		char *gems = config_entity_value(entity, "gems");
 		char *date = config_entity_value(entity, "date");
 
-		char *recordString = String_Create("%s %s Level:%s Gems:%s", name, date, level, gems);
-		console_put_string_at(console, recordString, 3, y, 0xeeeeeeff, 0x00000000);
+		char *nameString = String_Create("%20s", name);
+		console_put_string_at(console, nameString, 3, y, 0xe2f442ff, 0x00000000);
+		char *recordString = String_Create("%10s Level:%s Gems:%s", date, level, gems);
+		console_put_string_at(console, recordString, 23, y, 0xeeeeeeff, 0x00000000);
 
 		y += 2;
 		e = list_next(e);
 	}
 
 	// Instructions for active commands
-	console_put_string_at(console, "Start a (N)ew game", 8, 27, 0xbca285FF, 0x00000000);
-	console_put_string_at(console, "-or-", 15, 28, 0xbca285FF, 0x00000000);
-	console_put_string_at(console, "(ESC) to Quit", 10, 29, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "Start a (N)ew game", 18, 30, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "-or-", 25, 31, 0xbca285FF, 0x00000000);
+	console_put_string_at(console, "(ESC) to Quit", 20, 32, 0xbca285FF, 0x00000000);
 }
 
 

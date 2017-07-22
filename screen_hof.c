@@ -55,10 +55,16 @@ render_hof_entries(Console *console) {
 		char *gems = config_entity_value(entity, "gems");
 		char *date = config_entity_value(entity, "date");
 
-		char *recordString = String_Create("%s %s Level:%s Gems:%s", name, date, level, gems);
-		console_put_string_at(console, recordString, 18, y, 0xeeeeeeff, 0x00000000);
+		char *nameString = String_Create("%20s", name);
+		console_put_string_at(console, nameString, 16, y, 0xe2f442ff, 0x00000000);
+		char *dateString = String_Create("%10s", date);
+		console_put_string_at(console, dateString, 36, y, 0xeeeeeeff, 0x00000000);
+		char *levelString = String_Create("Level:%2s", level);
+		console_put_string_at(console, levelString, 47, y, 0xffd700ff, 0x00000000);
+		char *gemString = String_Create("Gems:%s", gems);
+		console_put_string_at(console, gemString, 56, y, 0xdb99fcff, 0x00000000);
 
-		y += 1;
+		y += 2;
 		e = list_next(e);
 	}
 }
@@ -80,14 +86,15 @@ render_hof_bg_view(Console *console)
 		view_draw_image_at(console, bgImage, 0, 0);	
 	}
 
-	UIRect rect = {15, 5, 50, 34};
+	UIRect rect = {10, 5, 60, 34};
 	view_draw_rect(console, &rect, 0x363247dd, 2, 0xaad700ff);
 
-	console_put_string_at(console, "-== HALL OF FAME ==-", 30, 7, 0xaad700ff, 0x00000000);
+	console_put_string_at(console, "-== HALL OF FAME ==-", 28, 7, 0xaad700ff, 0x00000000);
 
 	render_hof_entries(console);
 
-    console_put_string_at(console, "-== CREDITS ==-", 33, 32, 0xaad700ff, 0x00000000);
+    console_put_string_at(console, "-== CREDITS ==-", 31, 32, 0xaad700ff, 0x00000000);
+	console_put_string_at(console, "Coded live at twitch.tv/peteycodes by PeteyCodes", 15, 34, 0xffffffff, 0x00000000);
 
 }
 

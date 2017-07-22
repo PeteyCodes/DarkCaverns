@@ -1,0 +1,24 @@
+UI Notes:
+
+Screen is 80x45
+Map is 80x40
+
+Information we want to be always visible along with map:
+
+- Player stats - current and max HP
+- Combat stats - current attack and defense vals + modifiers
+- Nearby monsters - stats for monsters within 5 squares (not a hp number, just a status bar that gives a sense of damage taken)
+	- Maybe color of monster name indicates health? 5 colors indicating rough percentage of HP left.
+- Current dungeon level
+- Message log - last 5 lines of text
+
+
+GPUXP-F8SME-Z8XEX-2ZK64-FR7WG
+
+
+Color Palette
+http://www.paletton.com/#uid=70A0L0kaTcW9nnEaMiRfg9Ujn88
+
+Launch Image
+https://i.ytimg.com/vi/OMCqxNMiHzU/maxresdefault.jpg
+

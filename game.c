@@ -788,7 +788,9 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	// Note: We start at index 1 because the player is at index 0 and we want to keep them!
 	for (u32 i = 1; i < MAX_GO; i++) {
 		if ((gameObjects[i].id != player->id) && 
-			(gameObjects[i].id != UNUSED)) {
+			(gameObjects[i].id != UNUSED) &&
+			list_search(carriedItems, &gameObjects[i]) == NULL) {
+
 			game_object_destroy(&gameObjects[i]);
 		}
 	}

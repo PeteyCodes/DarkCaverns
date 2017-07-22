@@ -103,7 +103,7 @@ internal void
 render_inventory_view(Console *console) 
 {
 	UIRect rect = {0, 0, INVENTORY_WIDTH, INVENTORY_HEIGHT};
-	view_draw_rect(console, &rect, 0x222222FF, 1, 0xFF990099);
+	view_draw_rect(console, &rect, 0x222222FF, 0, 0xFF990099);
 
 	// We should load and process the bg image only once, not on each render
 	local_persist BitmapImage *bgImage = NULL;
