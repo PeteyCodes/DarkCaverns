@@ -393,6 +393,12 @@ asciify_bitmap(Console *con, BitmapImage *image) {
             BitmapImage *cellImage = &cells[r * cols + c];
             image_analyze_colors(cellImage, &primaryColor, &secondaryColor);
 
+            if (primaryColor == 0x00000000) {
+                u32 tmp = secondaryColor;
+                secondaryColor = primaryColor;
+                primaryColor = tmp;
+            }
+
             // Create a "1-bit" representation of the graphic indicating the "shape" of the cell
             BitmapImage *maskImage = image_mask_create(cellImage, primaryColor, secondaryColor);
 
@@ -475,8 +481,8 @@ image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor)
     // The colors should be distinct enough to be distiguishable.
 
     // Step one - count color occurrences
-    u32 *colors = malloc(image->width * image->height * sizeof(u32));
-    u32 *counts = malloc(image->width * image->height * sizeof(u32));
+    u32 *colors = calloc(image->width * image->height, sizeof(u32));
+    u32 *counts = calloc(image->width * image->height, sizeof(u32));
     u32 numColors = 0;
 
     for (u32 y = 0; y < image->height; y++) {
@@ -530,7 +536,7 @@ image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor)
         *secondaryColor = colors[sIdx];
     } else {
         // We only have one color
-        secondaryColor = 0x00000000;
+        *secondaryColor = 0x00000000;
     }
 
     free(colors);
@@ -596,10 +602,10 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
     ConsoleFont *font = console->font;
     u32 fontCols = font->atlasWidth / font->charWidth;
 
-    u32 matchCount = 0;
-    u32 matchIndex = 0;
+    i32 matchCount = 0;
+    asciiChar bestMatch = 0;
 
-    asciiChar drawingGlyphs[] = {219, 220, 221, 222, 223, 226, 227, 228, 229, 230, 231, 0};
+    asciiChar drawingGlyphs[] = {0, 219, 220, 221, 222, 223, 226, 227, 228, 229, 230, 231};
     u32 drawingGlyphCount = 12;
 
     // Loop through all drawing glyphs, looking for the best match to the mask image
@@ -608,23 +614,27 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
         u32 cellX = drawingGlyphs[dgi] % 16;
 
         // Compare all the pixels in the glyph to all the pixels in the mask
-        u32 matches = 0; 
+        i32 matches = 0; 
         for (u32 y = 0; y < font->charHeight; y++) {
             for (u32 x = 0; x < font->charWidth; x++) {
                 u32 glyphPixel = font->atlas[((cellY * font->charHeight + y) * font->atlasWidth) + (cellX * font->charWidth) + x];
-                u32 maskPixel = maskImage->pixels[y * font->charHeight + x];
+                u32 maskPixel = maskImage->pixels[y * font->charWidth + x];
 
-                if (glyphPixel == maskPixel) { matches += 1; }
+                if (glyphPixel == maskPixel) { 
+                    matches += 1; 
+                } else {
+                    matches -= 1;
+                }
             }
         }
 
         if (matches > matchCount) {
             matchCount = matches;
-            matchIndex = cellY * fontCols + cellX;
+            bestMatch = drawingGlyphs[dgi];
         }
     }
 
-    return matchIndex;
+    return bestMatch;
 }
 
 
