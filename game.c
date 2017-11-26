@@ -89,13 +89,13 @@ typedef struct {
 	i32 attackModifier;		// based on weapons/items
 	i32 defense;			// defense = damage absorbed before HP is affected
 	i32 defenseModifier;	// based on armor/items
-	i32 dodgeModifier;		// % that attack was missed/dodged/etc
 } Combat;
 
 typedef struct {
 	i32 objectId;
 	i32 quantity;
 	i32 weight;
+	i32 lifetime;			// turns until equipment degrades beyond use.
 	char *slot;
 	bool isEquipped;
 } Equipment;
@@ -131,6 +131,8 @@ typedef struct {
 
 /* Game State */
 #define MAX_GO 	10000
+#define EQUIP_LIFETIME 500
+
 global_variable GameObject *player = NULL;
 global_variable char* playerName = NULL;
 global_variable GameObject gameObjects[MAX_GO];
@@ -176,6 +178,7 @@ void combat_attack(GameObject *attacker, GameObject *defender);
 internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
 internal UIScreen * screen_show_endgame();
 internal void game_over();
+void item_toggle_equip(GameObject *item);
 
 
 
@@ -521,7 +524,6 @@ void game_object_update_component(GameObject *obj,
 				com->defense = combatData->defense;
 				com->attackModifier = combatData->attackModifier;
 				com->defenseModifier = combatData->defenseModifier;
-				com->dodgeModifier = combatData->dodgeModifier;
 
 				if (addedNew) {
 					list_insert_after(combatComps, NULL, com);				
@@ -553,6 +555,7 @@ void game_object_update_component(GameObject *obj,
 				equip->objectId = obj->id;
 				equip->quantity = equipData->quantity;
 				equip->weight = equipData->weight;
+				equip->lifetime = equipData->lifetime;
 				if (equipData->slot != NULL) {
 					equip->slot = malloc(strlen(equipData->slot) + 1);
 					strcpy(equip->slot, equipData->slot);
@@ -669,7 +672,7 @@ void floor_add(u8 x, u8 y) {
 }
 
 void item_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, 
-	i32 hitMod, i32 attMod, i32 defMod, i32 dodgeMod, i32 quantity, i32 weight, char *slot) {
+	i32 hitMod, i32 attMod, i32 defMod, i32 quantity, i32 weight, char *slot) {
 
 	GameObject *item = game_object_create();
 	Position pos = {.objectId = item->id, .x = x, .y = y, .layer = layer};
@@ -678,15 +681,15 @@ void item_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor,
 	game_object_update_component(item, COMP_PHYSICAL, &phys);
 	Visibility vis = {.objectId = item->id, .glyph = glyph, .fgColor = fgColor, .bgColor = 0x00000000, .visibleOutsideFOV = false, .name = name};
 	game_object_update_component(item, COMP_VISIBILITY, &vis);
-	Combat com = {.objectId = item->id, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod, .dodgeModifier = dodgeMod};
+	Combat com = {.objectId = item->id, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod };
 	game_object_update_component(item, COMP_COMBAT, &com);
-	Equipment eq = {.objectId = item->id, .quantity = quantity, .weight = weight, .slot = slot};
+	Equipment eq = {.objectId = item->id, .quantity = quantity, .weight = weight, .slot = slot, .lifetime = EQUIP_LIFETIME};
 	game_object_update_component(item, COMP_EQUIPMENT, &eq);
 }
 
 void npc_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor, 
 	u32 speed, u32 frequency, i32 maxHP, i32 hpRecRate, 
-	i32 toHit, i32 hitMod, i32 attack, i32 defense, i32 attMod, i32 defMod, i32 dodgeMod) {
+	i32 toHit, i32 hitMod, i32 attack, i32 defense, i32 attMod, i32 defMod) {
 	
 	GameObject *npc = game_object_create();
 	Position pos = {.objectId = npc->id, .x = x, .y = y, .layer = layer};
@@ -700,7 +703,7 @@ void npc_add(char *name, u8 x, u8 y, u8 layer, asciiChar glyph, u32 fgColor,
 	game_object_update_component(npc, COMP_MOVEMENT, &mv);
 	Health hlth = {.objectId = npc->id, .currentHP = maxHP, .maxHP = maxHP, .recoveryRate = hpRecRate};
 	game_object_update_component(npc, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .toHit = toHit, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod, .dodgeModifier = dodgeMod};
+	Combat com = {.objectId = npc->id, .attack = attack, .defense = defense, .toHit = toHit, .toHitModifier = hitMod, .attackModifier = attMod, .defenseModifier = defMod};
 	game_object_update_component(npc, COMP_COMBAT, &com);
 }
 
@@ -842,7 +845,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			i32 att = atoi(config_entity_value(monsterEntity, "com_attack"));
 			i32 def = atoi(config_entity_value(monsterEntity, "com_defense"));
 
-			npc_add(name, pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, hit, 0, att, def, 0, 0, 0);
+			npc_add(name, pt.x, pt.y, LAYER_TOP, g, c, s, f, hp, rr, hit, 0, att, def, 0, 0);
 		}
 	}
 
@@ -865,13 +868,12 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 			i32 toHitMod = atoi(config_entity_value(entity, "com_toHitModifier"));
 			i32 attMod = atoi(config_entity_value(entity, "com_attackModifier"));
 			i32 defMod = atoi(config_entity_value(entity, "com_defenseModifier"));
-			i32 dodgeMod = atoi(config_entity_value(entity, "com_dodgeModifier"));
 
 			i32 qty = atoi(config_entity_value(entity, "eq_quantity"));
 			char *slot = config_entity_value(entity, "eq_slot");
 			i32 weight = atoi(config_entity_value(entity, "eq_weight"));
 
-			item_add(name, pt.x, pt.y, LAYER_MID, g, c, toHitMod, attMod, defMod, dodgeMod, qty, weight, slot);
+			item_add(name, pt.x, pt.y, LAYER_MID, g, c, toHitMod, attMod, defMod, qty, weight, slot);
 		}
 	}
 	
@@ -1247,8 +1249,14 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 	Health *defHealth = (Health *)game_object_get_component(defender, COMP_HEALTH);
 
-	i32 totAtt = (rand() % att->attack) + att->attackModifier;
-	i32 totDef = (rand() % def->defense) + def->defenseModifier;
+	i32 totAtt = att->attack + att->attackModifier;
+	i32 totDef = def->defense + def->defenseModifier;
+	i32 monsterMod = 1 + (currentLevelNumber / 3);
+	if (attacker != player) {
+		totAtt += monsterMod;
+	} else {
+		totDef += monsterMod;		
+	}
 
 	if (totDef >= totAtt) {
 		if (attacker == player) {
@@ -1283,7 +1291,7 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 
 	i32 hitRoll = (rand() % 100) + 1;
-	i32 hitWindow = (att->toHit + att->toHitModifier) - def->dodgeModifier;
+	i32 hitWindow = (att->toHit + att->toHitModifier);
 	if ((hitRoll < hitWindow) || (hitRoll == 100)) {
 		// We have a hit
 		combat_deal_damage(attacker, defender);
@@ -1365,12 +1373,51 @@ void item_get() {
 				String_Destroy(msg);
 			}
 
+			playerTookTurn = true;
+
 		} else {
 			// Too much to carry
 			char *msg = String_Create("You are carrying too much already.");
 			add_message(msg, 0x990000ff);
 			String_Destroy(msg);
 		}
+	}
+}
+
+void item_lifetime_update() {
+	ListElement *e = list_head(carriedItems);
+	while (e != NULL) {
+		GameObject *go = (GameObject *)list_data(e);
+		Equipment *eq = game_object_get_component(go, COMP_EQUIPMENT);
+		eq->lifetime -= 1;
+
+		// Check to see if the item is aged beyond use
+		if (eq->lifetime <= 0) {
+			// Unequip the item if equipped
+			bool wasEquipped = false;
+			if (eq->isEquipped) {
+				wasEquipped = true;
+				item_toggle_equip(go);
+			}
+
+			// Remove from carried items
+			list_remove_element_with_data(carriedItems, go);
+			
+			// Display a message to the player
+			Visibility *v = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
+			char *msg;
+			if (wasEquipped) {
+				msg = String_Create("The %s crumbles in your hands.", v->name);
+			} else {
+				msg = String_Create("The %s you are carrying crumbles to dust.", v->name);
+			}
+			add_message(msg, 0x990000ff);
+			String_Destroy(msg);
+			
+			game_object_destroy(go);
+		}
+
+		e = list_next(e);
 	}
 }
 
@@ -1387,7 +1434,6 @@ void item_toggle_equip(GameObject *item) {
 			playerCombat->toHitModifier += c->toHitModifier;
 			playerCombat->attackModifier += c->attackModifier;
 			playerCombat->defenseModifier += c->defenseModifier;
-			playerCombat->dodgeModifier += c->dodgeModifier;
 
 			// Loop through all other carried items and unequip any other item that might have already
 			// been equipped in that slot
@@ -1402,7 +1448,6 @@ void item_toggle_equip(GameObject *item) {
 						playerCombat->toHitModifier -= cc->toHitModifier;
 						playerCombat->attackModifier -= cc->attackModifier;
 						playerCombat->defenseModifier -= cc->defenseModifier;
-						playerCombat->dodgeModifier -= cc->dodgeModifier;
 					}
 				}
 				le = list_next(le);
@@ -1412,7 +1457,6 @@ void item_toggle_equip(GameObject *item) {
 			playerCombat->toHitModifier -= c->toHitModifier;
 			playerCombat->attackModifier -= c->attackModifier;
 			playerCombat->defenseModifier -= c->defenseModifier;
-			playerCombat->dodgeModifier -= c->dodgeModifier;
 		}
 	}
 }
@@ -1518,7 +1562,7 @@ game_new()
 	game_object_update_component(player, COMP_PHYSICAL, &phys);
 	Health hlth = {.objectId = player->id, .currentHP = 20, .maxHP = 20, .recoveryRate = 1};
 	game_object_update_component(player, COMP_HEALTH, &hlth);
-	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0, .dodgeModifier = 0};
+	Combat com = {.objectId = player->id, .toHit=80, .toHitModifier=0, .attack = 5, .defense = 2, .attackModifier = 0, .defenseModifier = 0};
 	game_object_update_component(player, COMP_COMBAT, &com);
 
 	playerName = name_create();
@@ -1540,7 +1584,8 @@ game_update()
 	if (playerTookTurn) {
 		Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
 		generate_target_map(playerPos->x, playerPos->y);
-		movement_update();			
+		movement_update();		
+		item_lifetime_update();
 		environment_update(playerPos);
 
 		health_removal_update();
@@ -1576,7 +1621,7 @@ game_over() {
 		// If the current game's score is higher than this entry's score, it made the list right here
 		if (gemsFoundTotal >= gemCount) {
 			// Create a new config entity and load it up with this game's data
-			ConfigEntity *newEntity = (ConfigEntity *)malloc(sizeof(ConfigEntity));
+			ConfigEntity *newEntity = (ConfigEntity *)calloc(1, sizeof(ConfigEntity));
 			newEntity->name = String_Create("%s", "RECORD");
 			config_entity_set_value(newEntity, "name", playerName);
 			config_entity_set_value(newEntity, "gems", String_Create("%d", gemsFoundTotal));
@@ -1603,7 +1648,7 @@ game_over() {
 	// HoF contains fewer than 10 entries, add this game to the end.
 	if ((!hofUpdated) && (list_size(hofConfig->entities) < 10)) {
 		// Create a new config entity and load it up with this game's data
-		ConfigEntity *newEntity = (ConfigEntity *)malloc(sizeof(ConfigEntity));
+		ConfigEntity *newEntity = (ConfigEntity *)calloc(1, sizeof(ConfigEntity));
 		newEntity->name = String_Create("%s", "RECORD");
 		config_entity_set_value(newEntity, "name", playerName);
 		config_entity_set_value(newEntity, "gems", String_Create("%d", gemsFoundTotal));

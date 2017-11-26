@@ -219,6 +219,7 @@ ui_get_active_screen() {
 
 internal void 
 ui_set_active_screen(UIScreen *screen) {
+    if (activeScreen != NULL) { free(activeScreen); }
     activeScreen = screen;
 }
 
