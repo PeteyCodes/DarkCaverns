@@ -161,7 +161,7 @@ global_variable List *goPositions[MAP_WIDTH][MAP_HEIGHT];
 global_variable Config *monsterConfig = NULL;
 global_variable i32 monsterProbability[MONSTER_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
 global_variable Config *itemConfig = NULL;
-global_variable i32 itemProbability[ITEM_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
+global_variable i32 itemProbability[ITEM_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of items in config file
 global_variable Config *levelConfig = NULL;
 global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
 global_variable i32 maxItems[MAX_DUNGEON_LEVEL];
