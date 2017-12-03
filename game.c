@@ -177,6 +177,7 @@ void generate_target_map(i32 targetX, i32 targetY);
 void combat_attack(GameObject *attacker, GameObject *defender);
 internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
 internal UIScreen * screen_show_endgame();
+internal UIScreen * screen_show_win_game();
 internal void game_over();
 void item_toggle_equip(GameObject *item);
 
@@ -798,6 +799,13 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 		}
 	}
 
+	// Check for game win scenario
+	if (levelToGenerate == 21) {
+		game_over();
+		ui_set_active_screen(screen_show_win_game());
+		return;
+	}
+
 	// Generate a level map into the world state
 	bool (*mapCells)[MAP_HEIGHT] = malloc(MAP_WIDTH * MAP_HEIGHT);
 
@@ -897,8 +905,13 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	Point ptStairs = level_get_open_point(mapCells);
 	Position stairPos = {.objectId = stairs->id, .x = ptStairs.x, .y = ptStairs.y, .layer = LAYER_GROUND};
 	game_object_update_component(stairs, COMP_POSITION, &stairPos);
-	Visibility vis = {.objectId = stairs->id, .glyph = '>', .fgColor = 0xffd700ff, .bgColor = 0x00000000, .visibleOutsideFOV = true, .name="Stairs"};
-	game_object_update_component(stairs, COMP_VISIBILITY, &vis);
+	if (levelToGenerate < 20) {
+		Visibility vis = {.objectId = stairs->id, .glyph = '>', .fgColor = 0xffd700ff, .bgColor = 0x00000000, .visibleOutsideFOV = true, .name="Stairs"};
+		game_object_update_component(stairs, COMP_VISIBILITY, &vis);
+	} else {
+		Visibility vis = {.objectId = stairs->id, .glyph = 15, .fgColor = 0x80ff80ff, .bgColor = 0x00000000, .visibleOutsideFOV = true, .name="Stairs"};
+		game_object_update_component(stairs, COMP_VISIBILITY, &vis);
+	}
 	Physical phys = {.objectId = stairs->id, .blocksMovement = false, .blocksSight = false};
 	game_object_update_component(stairs, COMP_PHYSICAL, &phys);
 
@@ -911,16 +924,47 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 }
 
 void level_descend() {
-	currentLevelNumber += 1;
-	currentLevel = level_init(currentLevelNumber, player);
+	// Make sure that the player is on a staircase (or the end portal)
 	Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
-	fov_calculate(playerPos->x, playerPos->y, fovMap);
-	generate_target_map(playerPos->x, playerPos->y);
 
-	char *msg = String_Create("You descend further, and are now on level %d.", currentLevelNumber);
-	add_message("---------------------------------------------------", 0x555555ff);
-	add_message(msg, 0x990000ff);
-	String_Destroy(msg);
+	// Get objects at player's current position
+	List *objects = game_objects_at_position(playerPos->x, playerPos->y);
+	ListElement *e = list_head(objects);
+	bool foundStairs = false;
+	while (e != NULL) {
+		GameObject *go = (GameObject *)list_data(e);
+		Visibility *v = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
+		if ((v != NULL) && (String_Equals(v->name, "Stairs"))) {
+			foundStairs = true;
+			break;
+		}
+		e = list_next(e);
+	}
+
+	if (foundStairs) {
+		currentLevelNumber += 1;
+		currentLevel = level_init(currentLevelNumber, player);
+
+		if (currentLevelNumber <= 20) {
+			Position *playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+			fov_calculate(playerPos->x, playerPos->y, fovMap);
+			generate_target_map(playerPos->x, playerPos->y);
+
+			char *msg = String_Create("You descend further, and are now on level %d.", currentLevelNumber);
+			add_message("---------------------------------------------------", 0x555555ff);
+			add_message(msg, 0x990000ff);
+			String_Destroy(msg);
+		}
+
+		// Buff the player's base attack and defense
+		Combat *combatStats = (Combat *)game_object_get_component(player, COMP_COMBAT);
+		combatStats->attack += 2;
+		combatStats->defense += 1;
+
+	} else {
+		add_message("There are no stairs here, you silly person.", 0x555555ff);
+	}
+
 }
 
 // TODO: Need a level cleanup function 
@@ -1295,6 +1339,17 @@ void combat_attack(GameObject *attacker, GameObject *defender) {
 	if ((hitRoll < hitWindow) || (hitRoll == 100)) {
 		// We have a hit
 		combat_deal_damage(attacker, defender);
+	} else {
+		// Missed
+		if (attacker == player) {
+			add_message("Your attack misses.", 0xCCCCCCFF);
+
+		} else {
+			Visibility *vis = game_object_get_component(attacker, COMP_VISIBILITY);
+			char *msg = String_Create("The %s misses you.", vis->name);
+			add_message(msg, 0xCCCCCCFF);
+			String_Destroy(msg);
+		}
 	}
 }
 
@@ -1528,7 +1583,12 @@ void environment_update(Position *playerPos) {
 		}
 		Visibility *v = (Visibility *)game_object_get_component(go, COMP_VISIBILITY);
 		if ((v != NULL) && (String_Equals(v->name, "Stairs"))) {
-			char *msg = String_Create("There are stairs down here. [D]escend?", v->name);
+			char *msg;
+			if (currentLevelNumber < 20) {
+				msg = String_Create("There are stairs down here. [D]escend?", v->name);
+			} else {
+				msg = String_Create("There is a glowing portal here. [E]nter?", v->name);
+			}
 			add_message(msg, 0xffd700ff);
 			String_Destroy(msg);
 		}
@@ -1635,7 +1695,6 @@ game_over() {
 			// Insert an element containing new entity before the element 
 			// with the entity we're comparing to
 			ListElement *insertAfterThis = list_prev(e);
-			if (insertAfterThis == NULL) { insertAfterThis = list_tail(hofConfig->entities); }
 			list_insert_after(hofConfig->entities, insertAfterThis, newEntity);
 			hofUpdated = true;
 			break;

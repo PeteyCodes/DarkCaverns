@@ -8,7 +8,7 @@
 #define STATS_WIDTH		20
 #define STATS_HEIGHT 	5
 
-#define LOG_WIDTH		58
+#define LOG_WIDTH		60
 #define LOG_HEIGHT		5
 
 #define INVENTORY_LEFT		20
@@ -36,17 +36,20 @@ screen_show_in_game()
 
 	UIRect mapRect = {0, 0, (16 * MAP_WIDTH), (16 * MAP_HEIGHT)};
 	UIView *mapView = view_new(mapRect, MAP_WIDTH, MAP_HEIGHT, 
-							   "./terminal16x16.png", 0, render_game_map_view);
+							   "./terminal16x16.png", 0, 0x000000ff,
+							   render_game_map_view);
 	list_insert_after(igViews, NULL, mapView);
 
 	UIRect statsRect = {0, (16 * MAP_HEIGHT), (16 * STATS_WIDTH), (16 * STATS_HEIGHT)};
 	UIView *statsView = view_new(statsRect, STATS_WIDTH, STATS_HEIGHT,
-								 "./terminal16x16.png", 0, render_stats_view);
+								 "./terminal16x16.png", 0, 0x000000ff,
+								 render_stats_view);
 	list_insert_after(igViews, NULL, statsView);
 
-	UIRect logRect = {(16 * 22), (16 * MAP_HEIGHT), (16 * LOG_WIDTH), (16 * LOG_HEIGHT)};
+	UIRect logRect = {(16 * 20), (16 * MAP_HEIGHT), (16 * LOG_WIDTH), (16 * LOG_HEIGHT)};
 	UIView *logView = view_new(logRect, LOG_WIDTH, LOG_HEIGHT,
-							   "./terminal16x16.png", 0, render_message_log_view);
+							   "./terminal16x16.png", 0, 0x000000ff,
+							   render_message_log_view);
 	list_insert_after(igViews, NULL, logView);
 
 	UIScreen *inGameScreen = malloc(sizeof(UIScreen));
@@ -175,7 +178,7 @@ render_message_log_view(Console *console)
 	ListElement *e = list_tail(messageLog);
 	i32 msgCount = list_size(messageLog);
 	u32 row = 4;
-	u32 col = 0;
+	u32 col = 1;
 
 	if (msgCount < 5) {
 		row -= (5 - msgCount);
@@ -261,7 +264,8 @@ show_inventory_overlay(UIScreen *screen)
 	if (inventoryView == NULL) {
 		UIRect overlayRect = {(16 * INVENTORY_LEFT), (16 * INVENTORY_TOP), (16 * INVENTORY_WIDTH), (16 * INVENTORY_HEIGHT)};
 		inventoryView = view_new(overlayRect, INVENTORY_WIDTH, INVENTORY_HEIGHT, 
-								   "./terminal16x16.png", 0, render_inventory_view);
+								   "./terminal16x16.png", 0, 0x000000ff,
+								   render_inventory_view);
 		list_insert_after(screen->views, list_tail(screen->views), inventoryView);
 	}
 }
@@ -280,22 +284,20 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 
 		switch (key) {
 			// DEBUG
-			case SDLK_m: {
-				// Restart a new level with a new map
-				level_init(currentLevelNumber, player);
-				playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
-				fov_calculate(playerPos->x, playerPos->y, fovMap);
-				generate_target_map(playerPos->x, playerPos->y);
-			}
-			break;
+			// case SDLK_m: {
+			// 	// Restart a new level with a new map
+			// 	level_init(currentLevelNumber, player);
+			// 	playerPos = (Position *)game_object_get_component(player, COMP_POSITION);
+			// 	fov_calculate(playerPos->x, playerPos->y, fovMap);
+			// 	generate_target_map(playerPos->x, playerPos->y);
+			// }
+			// break;
 
-			case SDLK_x: {
-				game_over();
-				ui_set_active_screen(screen_show_endgame());	
-			}
-			break;
-
-
+			// case SDLK_x: {
+			// 	game_over();
+			// 	ui_set_active_screen(screen_show_endgame());	
+			// }
+			// break;
 			// END DEBUG
 
 			case SDLK_UP: {
@@ -447,6 +449,9 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 					if (le != NULL) {
 						item_toggle_equip(le->data);
 					}
+				} else {
+					// Enter portal, which is treated as descending to the next level
+					level_descend();
 				}
 			}
 			break;

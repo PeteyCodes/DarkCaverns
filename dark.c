@@ -52,6 +52,7 @@ void quit_game();
 #include "screen_launch.c"
 #include "screen_hof.c"
 #include "screen_end_game.c"
+#include "screen_win_game.c"
 
 
 internal void 
@@ -128,6 +129,12 @@ int main()
 						asciiMode = !asciiMode;
 					}
 					break;
+
+					// // DEBUG - jump straight to win screen
+					// case SDLK_w: {
+					// 	ui_set_active_screen(screen_show_win_game());
+					// }
+					// break;
 
 					default:
 						break;

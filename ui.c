@@ -55,6 +55,7 @@ typedef struct {
     u32 colCount;
     u32 cellWidth;
     u32 cellHeight;
+    u32 bgColor;
     ConsoleFont *font;
     ConsoleCell *cells;
 } Console;
@@ -142,7 +143,7 @@ internal void
 console_destroy(Console *con);
 
 internal Console *
-console_new(i32 width, i32 height, i32 rowCount, i32 colCount);
+console_new(i32 width, i32 height, i32 rowCount, i32 colCount, u32 bgColor);
 
 internal void 
 console_put_char_at(Console *con, asciiChar c, 
@@ -228,12 +229,13 @@ ui_set_active_screen(UIScreen *screen) {
 internal void 
 console_clear(Console *con) {
     UIRect r = {0, 0, con->width, con->height};
-    ui_fill(con->pixels, con->width, &r, 0x000000ff);
+    ui_fill(con->pixels, con->width, &r, con->bgColor);
 }
 
 internal Console *
 console_new(i32 width, i32 height, 
-            i32 rowCount, i32 colCount) {
+            i32 rowCount, i32 colCount,
+            u32 bgColor) {
     
     Console *con = malloc(sizeof(Console));
 
@@ -245,6 +247,7 @@ console_new(i32 width, i32 height,
     con->cellWidth = width / colCount;
     con->cellHeight = height / rowCount;
     con->font = NULL;
+    con->bgColor = bgColor;
     con->cells = calloc(rowCount * colCount, sizeof(ConsoleCell));
 
     return con;
@@ -643,14 +646,14 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
 
 internal UIView * 
 view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY, 
-         char *fontFile, asciiChar firstCharInAtlas, 
+         char *fontFile, asciiChar firstCharInAtlas, u32 bgColor,
          UIRenderFunction renderFn) {
 
     UIView *view = malloc(sizeof(UIView));
     UIRect *rect = malloc(sizeof(UIRect));
 
     memcpy(rect, &pixelRect, sizeof(UIRect));
-    Console *console = console_new(rect->w, rect->h, cellCountY, cellCountX);
+    Console *console = console_new(rect->w, rect->h, cellCountY, cellCountX, bgColor);
 
     i32 cellWidthPixels = pixelRect.w / cellCountX;
     i32 cellHeightPixels = pixelRect.h / cellCountY;

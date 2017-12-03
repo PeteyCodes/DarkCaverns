@@ -1,0 +1,17 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+    "files.associations": {
+        "corecrt_wtime.h": "c",
+        "time.h": "c",
+        "corecrt.h": "c",
+        "windef.h": "c",
+        "wtypes.h": "c",
+        "math.h": "c",
+        "winuser.h": "c",
+        "wingdi.h": "c",
+        "sdl_events.h": "c",
+        "sdl_rect.h": "c",
+        "sdl_touch.h": "c",
+        "stb_image.h": "c"
+    }
+}
