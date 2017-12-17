@@ -110,7 +110,7 @@ void map_generate(bool (*mapCells)[MAP_HEIGHT]) {
 			}
 
 			if (uSeg != NULL) {
-				Segment *segCopy = malloc(sizeof(Segment));
+				Segment *segCopy = calloc(1, sizeof(Segment));
 				memcpy(segCopy, uSeg, sizeof(Segment));
 				list_insert_after(hallways, NULL, segCopy);
 			}
@@ -256,7 +256,7 @@ void map_get_segments(List *segments, Point from, Point to, UIRect *rooms, u32 r
 			if (rm != -1) {
 				if (rm != currRoom) {
 					// We have a new segment between currRoom and rm
-					Segment *s = malloc(sizeof(Segment));
+					Segment *s = calloc(1, sizeof(Segment));
 					s->start = lastPoint;
 					s->end = curr;
 					s->roomFrom = currRoom;
@@ -273,7 +273,7 @@ void map_get_segments(List *segments, Point from, Point to, UIRect *rooms, u32 r
 
 			} else {
 				// We hit our midpoint and we're outside a room - record a partial segment
-				turnSegment = malloc(sizeof(Segment));
+				turnSegment = calloc(1, sizeof(Segment));
 				turnSegment->start = lastPoint;
 				turnSegment->mid = curr;
 				turnSegment->hasWaypoint = true;
@@ -310,7 +310,7 @@ void map_get_segments(List *segments, Point from, Point to, UIRect *rooms, u32 r
 
 				} else {
 					// We have a new segment between currRoom and rm
-					Segment *s = malloc(sizeof(Segment));
+					Segment *s = calloc(1, sizeof(Segment));
 					s->start = lastPoint;
 					s->end = curr;
 					s->roomFrom = currRoom;
@@ -332,7 +332,7 @@ void map_get_segments(List *segments, Point from, Point to, UIRect *rooms, u32 r
 					
 				} else {
 					// We have a new segment between currRoom and rm
-					Segment *s = malloc(sizeof(Segment));
+					Segment *s = calloc(1, sizeof(Segment));
 					s->start = lastPoint;
 					s->end = curr;
 					s->roomFrom = currRoom;

@@ -42,7 +42,7 @@ screen_show_launch()
 							   render_bg_view);
 	list_insert_after(launchViews, NULL, bgView);
 
-	UIScreen *launchScreen = malloc(sizeof(UIScreen));
+	UIScreen *launchScreen = calloc(1, sizeof(UIScreen));
 	launchScreen->views = launchViews;
 	launchScreen->activeView = menuView;
 	launchScreen->handle_event = handle_event_launch;

@@ -28,7 +28,7 @@ char * String_Create(const char * stringWithFormat, ...) {
     va_end(argp);
 
     // Allocate enough memory, and generate the formatted string for reals
-    str = malloc(len + 1);
+    str = calloc(len + 1, sizeof(char));
     if (!str) {
         return NULL;
     }
@@ -63,7 +63,7 @@ char * String_Append(char *string, const char * stringWithFormat, ...) {
     va_end(argp);
 
     // Allocate enough memory, and generate the formatted string for reals
-    stringToAppend = malloc(len + 1);
+    stringToAppend = calloc(len + 1, sizeof(char));
     if (!stringToAppend) {
         stringToAppend = "";
     }
@@ -75,7 +75,7 @@ char * String_Append(char *string, const char * stringWithFormat, ...) {
 
     // Allocate enough memory and concatenate the two strings
     int32_t totalLength = strlen(string) + strlen(stringToAppend) + 1;
-    char *combinedString = malloc(totalLength);
+    char *combinedString = calloc(totalLength, sizeof(char));
     strcpy(combinedString, string);
     strcat(combinedString, stringToAppend);
 

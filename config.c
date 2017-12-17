@@ -35,7 +35,7 @@ Config * config_file_parse(char * filename) {
 	// Open config file
 	FILE * configFile = fopen(filename, "r");
 	if (configFile) {
-		cfg = (Config *)malloc(sizeof(Config));
+		cfg = (Config *)calloc(1, sizeof(Config));
 		cfg->entities = list_new(free);
 		char buffer[CONFIG_MAX_LINE_LEN];
 
@@ -48,8 +48,8 @@ Config * config_file_parse(char * filename) {
 				char *entityName = strtok(buffer, "[]");	// grabs everything between brackets
 
 				// Create a new entity structure
-				ConfigEntity *entity = (ConfigEntity *)malloc(sizeof(ConfigEntity));
-				char *copy = malloc(strlen(entityName) + 1); 
+				ConfigEntity *entity = (ConfigEntity *)calloc(1, sizeof(ConfigEntity));
+				char *copy = calloc(strlen(entityName) + 1, sizeof(char)); 
 				strcpy(copy, entityName);
 				entity->name = copy;
 				entity->keyValuePairs = list_new(free);
@@ -62,11 +62,11 @@ Config * config_file_parse(char * filename) {
 				char *key = strtok(buffer, "=");
 				char *value = strtok(NULL, "\n");
 				if ((key != NULL) && (value != NULL)) {
-					ConfigKeyValuePair *kv = (ConfigKeyValuePair *)malloc(sizeof(ConfigKeyValuePair));
-					char *copyKey = malloc(strlen(key) + 1); 
+					ConfigKeyValuePair *kv = (ConfigKeyValuePair *)calloc(1, sizeof(ConfigKeyValuePair));
+					char *copyKey = calloc(strlen(key) + 1, sizeof(char)); 
 					strcpy(copyKey, key);
 					kv->key = copyKey;
-					char *copyValue = malloc(strlen(value) + 1); 
+					char *copyValue = calloc(strlen(value) + 1, sizeof(char)); 
 					strcpy(copyValue, value);
 					kv->value = copyValue;
 
@@ -107,7 +107,7 @@ void config_entity_set_value(ConfigEntity *entity, char *key, char *value) {
 		entity->keyValuePairs = list_new(free);
 	}
 
-	ConfigKeyValuePair *kv = malloc(sizeof(ConfigKeyValuePair));
+	ConfigKeyValuePair *kv = calloc(1, sizeof(ConfigKeyValuePair));
 	kv->key = strdup(key);
 	kv->value = strdup(value);
 

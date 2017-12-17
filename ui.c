@@ -237,7 +237,7 @@ console_new(i32 width, i32 height,
             i32 rowCount, i32 colCount,
             u32 bgColor) {
     
-    Console *con = malloc(sizeof(Console));
+    Console *con = calloc(1, sizeof(Console));
 
     con->pixels = calloc(width * height, sizeof(u32));
     con->width = width;
@@ -332,7 +332,7 @@ console_set_bitmap_font(Console *con, char *filename,
 
     // Copy the image data so we can hold onto it
     u32 imgDataSize = imgWidth * imgHeight * sizeof(u32);
-    u32 *atlasData = malloc(imgDataSize);
+    u32 *atlasData = calloc(imgDataSize, sizeof(u32));
     memcpy(atlasData, imgData, imgDataSize);
 
     // Swap endianness of data if we need to
@@ -351,7 +351,7 @@ console_set_bitmap_font(Console *con, char *filename,
     }        
 
     // Create and configure the font
-    ConsoleFont *font = malloc(sizeof(ConsoleFont));
+    ConsoleFont *font = calloc(1, sizeof(ConsoleFont));
     font->atlas = atlasData;
     font->charWidth = charWidth;
     font->charHeight = charHeight;
@@ -379,8 +379,8 @@ asciify_bitmap(Console *con, BitmapImage *image) {
     i32 rows = image->height / con->cellHeight;
     i32 cols = image->width / con->cellWidth;
 
-    AsciiImage *asciiImg = malloc(sizeof(AsciiImage));
-    asciiImg->cells = malloc(rows * cols * sizeof(ConsoleCell));
+    AsciiImage *asciiImg = calloc(1, sizeof(AsciiImage));
+    asciiImg->cells = calloc(rows * cols, sizeof(ConsoleCell));
     asciiImg->rows = rows;
     asciiImg->cols = cols;
 
@@ -444,13 +444,13 @@ image_slice(BitmapImage *img, i32 rows, i32 cols) {
     // Slice the given image into a 2D array of image cells
     i32 cellWidth = img->width / cols;
     i32 cellHeight = img->height / rows;
-    BitmapImage *cells = malloc(rows * cols * sizeof(BitmapImage));
+    BitmapImage *cells = calloc(rows * cols, sizeof(BitmapImage));
     for (i32 cellY = 0; cellY < rows; cellY++) {
         for (i32 cellX = 0; cellX < cols; cellX++) {
             BitmapImage *cellBM = &cells[(cellY * cols) + cellX];
             cellBM->width = cellWidth;
             cellBM->height = cellHeight;
-            cellBM->pixels = malloc(cellWidth * cellHeight * sizeof(u32));
+            cellBM->pixels = calloc(cellWidth * cellHeight, sizeof(u32));
 
             for (i32 y = 0; y < cellHeight; y++) {
                 memcpy(&cellBM->pixels[y * cellWidth], 
@@ -557,7 +557,7 @@ image_load_from_file(char *filename) {
 
     // Copy the image data so we can hold onto it
     u32 imgDataSize = imgWidth * imgHeight * sizeof(u32);
-    u32 *imageData = malloc(imgDataSize);
+    u32 *imageData = calloc(imgDataSize, sizeof(u32));
     memcpy(imageData, imgData, imgDataSize);
 
     // Swap endianness of data if we need to
@@ -568,7 +568,7 @@ image_load_from_file(char *filename) {
         }        
     }
 
-    BitmapImage *bmi = malloc(sizeof(BitmapImage));
+    BitmapImage *bmi = calloc(1, sizeof(BitmapImage));
     bmi->pixels = imageData;
     bmi->width = imgWidth;
     bmi->height = imgHeight;
@@ -582,10 +582,10 @@ internal BitmapImage *
 image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor) 
 {
     // Create a "1-bit" version of the given image
-    BitmapImage *maskImage = malloc(sizeof(BitmapImage));
+    BitmapImage *maskImage = calloc(1, sizeof(BitmapImage));
     maskImage->width = origImage->width;
     maskImage->height = origImage->height;
-    maskImage->pixels = malloc(origImage->width * origImage->height * sizeof(u32));
+    maskImage->pixels = calloc(origImage->width * origImage->height, sizeof(u32));
 
     for (u32 y = 0; y < origImage->height; y++) {
         for (u32 x = 0; x < origImage->width; x++) {
@@ -649,8 +649,8 @@ view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY,
          char *fontFile, asciiChar firstCharInAtlas, u32 bgColor,
          UIRenderFunction renderFn) {
 
-    UIView *view = malloc(sizeof(UIView));
-    UIRect *rect = malloc(sizeof(UIRect));
+    UIView *view = calloc(1, sizeof(UIView));
+    UIRect *rect = calloc(1, sizeof(UIRect));
 
     memcpy(rect, &pixelRect, sizeof(UIRect));
     Console *console = console_new(rect->w, rect->h, cellCountY, cellCountX, bgColor);

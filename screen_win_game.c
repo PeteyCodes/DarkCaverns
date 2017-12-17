@@ -38,7 +38,7 @@ screen_show_win_game()
                                render_win_bg_view);
 	list_insert_after(views, NULL, bgView);
 
-	UIScreen *winScreen = malloc(sizeof(UIScreen));
+	UIScreen *winScreen = calloc(1, sizeof(UIScreen));
 	winScreen->views = views;
 	winScreen->activeView = bgView;
 	winScreen->handle_event = handle_event_win;

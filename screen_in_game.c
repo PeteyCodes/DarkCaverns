@@ -52,7 +52,7 @@ screen_show_in_game()
 							   render_message_log_view);
 	list_insert_after(igViews, NULL, logView);
 
-	UIScreen *inGameScreen = malloc(sizeof(UIScreen));
+	UIScreen *inGameScreen = calloc(1, sizeof(UIScreen));
 	inGameScreen->views = igViews;
 	inGameScreen->activeView = mapView;
 	inGameScreen->handle_event = handle_event_in_game;

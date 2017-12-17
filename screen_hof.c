@@ -27,7 +27,7 @@ screen_show_hof()
 							   render_hof_bg_view);
 	list_insert_after(views, NULL, bgView);
 
-	UIScreen *hofScreen = malloc(sizeof(UIScreen));
+	UIScreen *hofScreen = calloc(1, sizeof(UIScreen));
 	hofScreen->views = views;
 	hofScreen->activeView = bgView;
 	hofScreen->handle_event = handle_event_hof;

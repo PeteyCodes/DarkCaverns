@@ -38,7 +38,7 @@ screen_show_endgame()
 							   render_endgame_bg_view);
 	list_insert_after(subViews, NULL, bgView);
 
-	UIScreen *endScreen = malloc(sizeof(UIScreen));
+	UIScreen *endScreen = calloc(1, sizeof(UIScreen));
 	endScreen->views = subViews;
 	endScreen->activeView = infoView;
 	endScreen->handle_event = handle_event_endgame;

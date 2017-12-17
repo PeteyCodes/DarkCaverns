@@ -26,6 +26,7 @@ typedef enum {
 	COMP_COMBAT,
 	COMP_EQUIPMENT,
 	COMP_TREASURE,
+	COMP_ANIMATION, 
 
 	/* Define other components above here */
 	COMPONENT_COUNT
@@ -105,6 +106,15 @@ typedef struct {
 	i32 value;
 } Treasure;
 
+typedef struct {
+	i32 objectId;
+	i32 keyFrameInterval;
+	i32 ticksUntilKeyframe;
+	bool finished;
+	void (*keyframeAnimation)(u32);
+	u32 value1;
+} Animation;
+
 /* Level Support */
 
 typedef struct {
@@ -144,6 +154,7 @@ global_variable List *healthComps;
 global_variable List *combatComps;
 global_variable List *equipmentComps;
 global_variable List *treasureComps;
+global_variable List *animationComps;
 
 global_variable List *carriedItems;
 global_variable i32 maxWeightAllowed = 20;
@@ -170,6 +181,7 @@ global_variable i32 maxItems[MAX_DUNGEON_LEVEL];
 global_variable List *messageLog = NULL;
 global_variable Config *hofConfig = NULL;
 
+
 /* Necessary function declarations */
 
 void add_message(char *msg, u32 color);
@@ -180,7 +192,7 @@ internal UIScreen * screen_show_endgame();
 internal UIScreen * screen_show_win_game();
 internal void game_over();
 void item_toggle_equip(GameObject *item);
-
+void animateGem(u32 gameObjectId);
 
 
 /* World State Management */
@@ -190,7 +202,7 @@ void get_appearance_prob(Config *config, i32 (*probabilities)[MAX_DUNGEON_LEVEL]
 	while (e != NULL) {
 		ConfigEntity *entity = (ConfigEntity *)e->data;
 		char *appearance_prob = config_entity_value(entity, "appearance_prob");
-		char *copy = (char *)malloc(strlen(appearance_prob) + 1);
+		char *copy = (char *)calloc(strlen(appearance_prob) + 1, sizeof(char));
 		strcpy(copy, appearance_prob);
 
 		char *idString = config_entity_value(entity, "id");
@@ -226,7 +238,7 @@ void get_appearance_prob(Config *config, i32 (*probabilities)[MAX_DUNGEON_LEVEL]
 
 void get_max_counts(ConfigEntity *entity, char *propertyName, i32 *maxCounts) {
 	char *countsString = config_entity_value(entity, propertyName);
-	char *copy = (char *)malloc(strlen(countsString) + 1);
+	char *copy = (char *)calloc(strlen(countsString) + 1, sizeof(char));
 	strcpy(copy, countsString);
 
 	char *lvl = strtok(copy, ",");
@@ -266,8 +278,10 @@ void world_state_init() {
 	combatComps = list_new(free);
 	equipmentComps = list_new(free);
 	treasureComps = list_new(free);
+	animationComps = list_new(free);
 
 	carriedItems = list_new(free);
+	gemsFoundTotal = 0;
 
 	// Parse necessary config files into memory
 	monsterConfig = config_file_parse("monsters.cfg");
@@ -332,7 +346,7 @@ void game_object_update_component(GameObject *obj,
 				Position *pos = obj->components[COMP_POSITION];
 				bool addedNew = false;
 				if (pos == NULL) {
-					pos = (Position *)malloc(sizeof(Position));
+					pos = (Position *)calloc(1, sizeof(Position));
 					addedNew = true;
 				} else {
 					// Remove game obj from the position helper DS
@@ -381,7 +395,7 @@ void game_object_update_component(GameObject *obj,
 				Visibility *vis = obj->components[COMP_VISIBILITY];
 				bool addedNew = false;
 				if (vis == NULL)  {
-					vis = (Visibility *)malloc(sizeof(Visibility));
+					vis = (Visibility *)calloc(1, sizeof(Visibility));
 					addedNew = true;
 				}
 				Visibility *visData = (Visibility *)compData;
@@ -392,7 +406,7 @@ void game_object_update_component(GameObject *obj,
 				vis->hasBeenSeen = visData->hasBeenSeen;
 				vis->visibleOutsideFOV = visData->visibleOutsideFOV;
 				if (visData->name != NULL) {
-					vis->name = malloc(strlen(visData->name) + 1);
+					vis->name = calloc(strlen(visData->name) + 1, sizeof(char));
 					strcpy(vis->name, visData->name);
 				}
 
@@ -419,7 +433,7 @@ void game_object_update_component(GameObject *obj,
 				Physical *phys = obj->components[COMP_PHYSICAL];
 				bool addedNew = false;
 				if (phys == NULL) {
-					phys = (Physical *)malloc(sizeof(Physical));
+					phys = (Physical *)calloc(1, sizeof(Physical));
 					addedNew = true;
 				}
 				Physical *physData = (Physical *)compData;
@@ -449,7 +463,7 @@ void game_object_update_component(GameObject *obj,
 				Movement *mv = obj->components[COMP_MOVEMENT];
 				bool addedNew = false;
 				if (mv == NULL) {
-					mv = (Movement *)malloc(sizeof(Movement));
+					mv = (Movement *)calloc(1, sizeof(Movement));
 					addedNew = true;
 				}
 				Movement *mvData = (Movement *)compData;
@@ -482,7 +496,7 @@ void game_object_update_component(GameObject *obj,
 				Health *hlth = obj->components[COMP_HEALTH];
 				bool addedNew = false;
 				if (hlth == NULL) {
-					hlth = (Health *)malloc(sizeof(Health));
+					hlth = (Health *)calloc(1, sizeof(Health));
 					addedNew = true;
 				}
 				Health *hlthData = (Health *)compData;
@@ -514,7 +528,7 @@ void game_object_update_component(GameObject *obj,
 				Combat *com = obj->components[COMP_COMBAT];
 				bool addedNew = false;
 				if (com == NULL) {
-					com = (Combat *)malloc(sizeof(Combat));
+					com = (Combat *)calloc(1, sizeof(Combat));
 					addedNew = true;
 				}
 				Combat *combatData = (Combat *)compData;
@@ -548,7 +562,7 @@ void game_object_update_component(GameObject *obj,
 				Equipment *equip = obj->components[COMP_EQUIPMENT];
 				bool addedNew = false;
 				if (equip == NULL) {
-					equip = (Equipment *)malloc(sizeof(Equipment));
+					equip = (Equipment *)calloc(1, sizeof(Equipment));
 					addedNew = true;
 				}
 
@@ -558,7 +572,7 @@ void game_object_update_component(GameObject *obj,
 				equip->weight = equipData->weight;
 				equip->lifetime = equipData->lifetime;
 				if (equipData->slot != NULL) {
-					equip->slot = malloc(strlen(equipData->slot) + 1);
+					equip->slot = calloc(strlen(equipData->slot) + 1, sizeof(char));
 					strcpy(equip->slot, equipData->slot);
 				}
 				equip->isEquipped = equipData->isEquipped;
@@ -585,7 +599,7 @@ void game_object_update_component(GameObject *obj,
 				Treasure *treas = obj->components[COMP_TREASURE];
 				bool addedNew = false;
 				if (treas == NULL) {
-					treas = (Treasure *)malloc(sizeof(Treasure));
+					treas = (Treasure *)calloc(1, sizeof(Treasure));
 					addedNew = true;
 				}
 
@@ -603,6 +617,40 @@ void game_object_update_component(GameObject *obj,
 				Treasure *t = obj->components[COMP_TREASURE];
 				if (t != NULL) {
 					list_remove_element_with_data(treasureComps, t);				
+				}
+				obj->components[comp] = NULL;				
+			}
+
+			break;
+		}
+
+		case COMP_ANIMATION: {
+			if (compData != NULL) {
+				Animation *anim = obj->components[COMP_ANIMATION];
+				bool addedNew = false;
+				if (anim == NULL) {
+					anim = (Animation *)calloc(1, sizeof(Animation));
+					addedNew = true;
+				}
+
+				Animation *animData = (Animation *)compData;
+				anim->objectId = obj->id;
+				anim->keyFrameInterval = animData->keyFrameInterval;
+				anim->ticksUntilKeyframe = animData->ticksUntilKeyframe;
+				anim->finished = animData->finished;
+				anim->keyframeAnimation = animData->keyframeAnimation;
+				anim->value1 = animData->value1;
+
+				if (addedNew) {
+					list_insert_after(animationComps, NULL, anim);				
+				}
+				obj->components[comp] = anim;
+				
+			} else {
+				// Clear component 
+				Animation *a = obj->components[COMP_ANIMATION];
+				if (a != NULL) {
+					list_remove_element_with_data(animationComps, a);				
 				}
 				obj->components[comp] = NULL;				
 			}
@@ -640,6 +688,9 @@ void game_object_destroy(GameObject *obj) {
 
 	elementToRemove = list_search(treasureComps, obj->components[COMP_TREASURE]);
 	if (elementToRemove != NULL ) { list_remove(treasureComps, elementToRemove); }
+
+	elementToRemove = list_search(animationComps, obj->components[COMP_ANIMATION]);
+	if (elementToRemove != NULL ) { list_remove(animationComps, elementToRemove); }
 
 	// TODO: Clean up other components used by this object
 
@@ -807,7 +858,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	}
 
 	// Generate a level map into the world state
-	bool (*mapCells)[MAP_HEIGHT] = malloc(MAP_WIDTH * MAP_HEIGHT);
+	bool (*mapCells)[MAP_HEIGHT] = calloc(MAP_WIDTH * MAP_HEIGHT, sizeof(bool));
 
 	map_generate(mapCells);
 
@@ -822,7 +873,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	}
 
 	// Create DungeonLevel Object and store relevant info
-	DungeonLevel *level = malloc(sizeof(DungeonLevel));
+	DungeonLevel *level = calloc(1, sizeof(DungeonLevel));
 	level->level = levelToGenerate;
 	level->mapWalls = mapCells;
 
@@ -865,7 +916,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 		ConfigEntity *entity = get_entity_with_id(itemConfig, itemId);
 
 		if (entity != NULL) {
-			// Add the monster		
+			// Add the item		
 			Point pt = level_get_open_point(mapCells);
 			char *name = config_entity_value(entity, "name");
 			char *glyph = config_entity_value(entity, "vis_glyph");
@@ -898,6 +949,8 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 		game_object_update_component(gem, COMP_PHYSICAL, &phys);
 		Treasure treas = {.objectId = gem->id, .value = 1};
 		game_object_update_component(gem, COMP_TREASURE, &treas);
+		Animation anim = {.objectId = gem->id, .keyFrameInterval = 3, .ticksUntilKeyframe = 3, .finished = false, .keyframeAnimation = animateGem, .value1 = 0};
+		game_object_update_component(gem, COMP_ANIMATION, &anim);
 	}
 
 	// Place a staircase in a random position in the level
@@ -973,9 +1026,9 @@ void level_descend() {
 /* Message */
 void add_message(char *msg, u32 color) {
 
-	Message *m = malloc(sizeof(Message));
+	Message *m = calloc(1, sizeof(Message));
 	if (msg != NULL) {
-		m->msg = malloc(strlen(msg) + 1);
+		m->msg = calloc(strlen(msg) + 1, sizeof(char));
 		strcpy(m->msg, msg);		
 	} else {
 		m->msg = "";
@@ -1038,7 +1091,7 @@ void generate_target_map(i32 targetX, i32 targetY) { // List *targetPoints) {
 		free(targetMap);
 	}
 
-	i32 (* dmap)[MAP_HEIGHT] = malloc(MAP_WIDTH * MAP_HEIGHT * sizeof(i32));
+	i32 (* dmap)[MAP_HEIGHT] = calloc(MAP_WIDTH * MAP_HEIGHT, sizeof(i32));
 	i32 UNSET = 9999;
 
 	for (i32 x = 0; x < MAP_WIDTH; x++) {
@@ -1605,8 +1658,35 @@ void environment_update(Position *playerPos) {
 }
 
 
-/* High-level Game Routines */
+/* Animation Management Routines */
 
+void animation_update() {
+	// Look at all animations in the list and do any necessary clean up or
+	// keyframe work.
+	ListElement *e = list_head(animationComps);
+	while (e != NULL) {
+		Animation *anim = (Animation *)list_data(e);
+		if (anim->finished) {
+			// Animation is done - clean it up
+			ListElement *eToRemove = e;
+			e = list_prev(e);
+			GameObject go = gameObjects[anim->objectId];
+			game_object_update_component(&go, COMP_ANIMATION, NULL);
+		}
+
+		anim->ticksUntilKeyframe -= 1;
+		if (anim->ticksUntilKeyframe <= 0) {
+			// Time for a keyframe
+			anim->ticksUntilKeyframe = anim->keyFrameInterval;
+			anim->keyframeAnimation(anim->objectId);
+		}
+
+		e = list_next(e);
+	}	
+}
+
+
+/* High-level Game Routines */
 
 internal void
 game_new()
@@ -1658,6 +1738,8 @@ game_update()
 		recalculateFOV = false;
 	}
 
+	// Check for animation updates
+	animation_update();
 }
 
 internal void
@@ -1742,4 +1824,54 @@ game_over() {
 
 
 
+// Animations
 
+void animateGem(u32 gameObjectId) {
+	// Gem color will cycle up to "maximum white" and then 
+	// back to original purple, giving a shine effect.
+	// Gem original color = 0x753aabff
+	u32 oRed = 0x75;
+	u32 oGreen = 0x3a;
+	u32 oBlue = 0xab;
+	u32 oAlpha = 0xff;
+
+	// Get our game object
+	GameObject go = gameObjects[gameObjectId];
+
+	// Get the animation component
+	Animation *anim = (Animation *)game_object_get_component(&go, COMP_ANIMATION);
+
+	// Get the visual component
+	Visibility *vis = (Visibility *)game_object_get_component(&go, COMP_VISIBILITY);
+	
+	u32 color = vis->fgColor;
+	u32 r = RED(color);
+	u32 g = GREEN(color);
+	u32 b = BLUE(color);
+	u32 a = ALPHA(color);
+
+	if (anim->value1 == 0) {
+		// Moving towards white
+		r += 10;
+		g += 10;
+		b += 10;
+		if (r >= 255 || g >= 255 || b >= 255) {
+			// We've hit "maximum white", so reverse course
+			anim->value1 = 1;
+			return;
+		}
+
+	} else {
+		// Moving towards purple
+		r -= 10;
+		g -= 10;
+		b -= 10;
+		if (r < oRed || g < oGreen || b < oBlue) {
+			// We've hit "origina purple", so reverse course
+			anim->value1 = 0;
+			return;
+		}
+	}
+
+	vis->fgColor = COLOR_FROM_RGBA(r, g, b, a);
+}

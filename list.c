@@ -44,7 +44,7 @@ e.g. for malloc, send a pointer to free. For data that shouldn't be cleaned
 up, send NULL.
 */
 List * list_new(void (*destroy)(void* data)) {
-	List *list = malloc(sizeof(List));
+	List *list = calloc(1, sizeof(List));
 
 	if (list != NULL) {
 		list->size = 0;
@@ -65,7 +65,7 @@ Returns true on success, false on failure.
 bool list_insert_after(List *list, ListElement *element, void *data) {
 	ListElement *newElement;
 
-	if ((newElement = (ListElement *)malloc(sizeof(ListElement))) == NULL) {
+	if ((newElement = (ListElement *)calloc(1, sizeof(ListElement))) == NULL) {
 		return false;
 	}
 
