@@ -127,6 +127,9 @@ int main()
 				switch (key) {
 					case SDLK_t: {
 						asciiMode = !asciiMode;
+						if (currentlyInGame) {
+							ui_set_active_screen(screen_show_in_game());
+						}
 					}
 					break;
 

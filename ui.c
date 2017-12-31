@@ -56,6 +56,7 @@ typedef struct {
     u32 cellWidth;
     u32 cellHeight;
     u32 bgColor;
+    bool colorize;
     ConsoleFont *font;
     ConsoleCell *cells;
 } Console;
@@ -120,8 +121,8 @@ view_destroy(UIView *view);
 
 internal UIView * 
 view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY, 
-         char *fontFile, asciiChar firstCharInAtlas, 
-         UIRenderFunction renderFn);
+         char *fontFile, asciiChar firstCharInAtlas, u32 bgColor,
+         bool colorize, UIRenderFunction renderFn);
 
 internal void 
 view_draw_rect(Console *console, UIRect *rect, u32 color, 
@@ -143,7 +144,7 @@ internal void
 console_destroy(Console *con);
 
 internal Console *
-console_new(i32 width, i32 height, i32 rowCount, i32 colCount, u32 bgColor);
+console_new(i32 width, i32 height, i32 rowCount, i32 colCount, u32 bgColor, bool colorize);
 
 internal void 
 console_put_char_at(Console *con, asciiChar c, 
@@ -195,7 +196,7 @@ ui_colorize_pixel(u32 dest, u32 src);
 internal void
 ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
            u32 *srcPixels, UIRect *srcRect, u32 srcPixelsPerRow,
-           u32 *newColor);
+           bool colorize, u32 *newColor);
 
 internal void
 ui_fill(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color);
@@ -235,7 +236,7 @@ console_clear(Console *con) {
 internal Console *
 console_new(i32 width, i32 height, 
             i32 rowCount, i32 colCount,
-            u32 bgColor) {
+            u32 bgColor, bool colorize) {
     
     Console *con = calloc(1, sizeof(Console));
 
@@ -248,6 +249,7 @@ console_new(i32 width, i32 height,
     con->cellHeight = height / rowCount;
     con->font = NULL;
     con->bgColor = bgColor;
+    con->colorize = colorize;
     con->cells = calloc(rowCount * colCount, sizeof(ConsoleCell));
 
     return con;
@@ -275,8 +277,8 @@ console_put_char_at(Console *con, asciiChar c,
     // Copy the glyph with alpha blending and desired coloring
     UIRect srcRect = rect_get_for_glyph(c, con->font);
     ui_copy_blend(con->pixels, &destRect, con->width, 
-                 con->font->atlas, &srcRect, con->font->atlasWidth,
-                 &fgColor);
+                con->font->atlas, &srcRect, con->font->atlasWidth,
+                con->colorize, &fgColor);
 }
 
 internal void 
@@ -647,13 +649,14 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
 internal UIView * 
 view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY, 
          char *fontFile, asciiChar firstCharInAtlas, u32 bgColor,
-         UIRenderFunction renderFn) {
+         bool colorize, UIRenderFunction renderFn) {
 
     UIView *view = calloc(1, sizeof(UIView));
     UIRect *rect = calloc(1, sizeof(UIRect));
 
     memcpy(rect, &pixelRect, sizeof(UIRect));
-    Console *console = console_new(rect->w, rect->h, cellCountY, cellCountX, bgColor);
+    Console *console = console_new(rect->w, rect->h, cellCountY, cellCountX, 
+        bgColor, colorize);
 
     i32 cellWidthPixels = pixelRect.w / cellCountX;
     i32 cellHeightPixels = pixelRect.h / cellCountY;
@@ -769,7 +772,7 @@ ui_colorize_pixel(u32 dest, u32 src)
 internal void
 ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
               u32 *srcPixels, UIRect *srcRect, u32 srcPixelsPerRow,
-              u32 *newColor)
+              bool colorize, u32 *newColor)
 {
     // If src and dest rects are not the same size ==> bad things
     assert(destRect->w == srcRect->w && destRect->h == srcRect->h);
@@ -792,8 +795,21 @@ ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
             u32 *destPixel = &destPixels[(dstY * destPixelsPerRow) + dstX];
             u32 destColor = *destPixel;
 
+            // If source pixel is true black (0,0,0,255) then treat it as alpha = 0
+            if ((RED(srcColor) == 0) && (GREEN(srcColor) == 0) && 
+                (BLUE(srcColor) == 0) && (ALPHA(srcColor) == 255)) {
+                    srcColor = COLOR_FROM_RGBA(RED(srcColor), GREEN(srcColor), BLUE(srcColor), 0);
+                }
+
             // Colorize our source pixel before we blend it
-            srcColor = ui_colorize_pixel(srcColor, *newColor);
+            if (colorize) {
+                srcColor = ui_colorize_pixel(srcColor, *newColor);
+            } else {
+                // Just apply the alpha value from the newColor, unless the src is transparent
+                if (ALPHA(srcColor) > 0) {
+                    srcColor = COLOR_FROM_RGBA(RED(srcColor), GREEN(srcColor), BLUE(srcColor), ALPHA(*newColor));
+                }
+            }
 
             if (ALPHA(srcColor) == 0) {
                 // Source is transparent - so do nothing

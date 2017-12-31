@@ -24,7 +24,7 @@ screen_show_hof()
 	UIRect bgRect = {0, 0, (16 * BG_WIDTH), (16 * BG_HEIGHT)};
 	UIView *bgView = view_new(bgRect, BG_WIDTH, BG_HEIGHT, 
 							   "./terminal16x16.png", 0, 0x000000ff, 
-							   render_hof_bg_view);
+							   true, render_hof_bg_view);
 	list_insert_after(views, NULL, bgView);
 
 	UIScreen *hofScreen = calloc(1, sizeof(UIScreen));

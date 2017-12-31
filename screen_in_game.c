@@ -35,21 +35,33 @@ screen_show_in_game()
 	List *igViews = list_new(NULL);
 
 	UIRect mapRect = {0, 0, (16 * MAP_WIDTH), (16 * MAP_HEIGHT)};
+	char *tileset;
+	bool colorize = true;
+	u32 bgColor;
+	if (asciiMode) {
+		tileset = "./terminal16x16.png";
+		colorize = true;
+		bgColor = 0x000000ff;
+	} else {
+		tileset = "./graphic16x16.png";
+		colorize = false;
+		bgColor = 0x00000000;
+	}
 	UIView *mapView = view_new(mapRect, MAP_WIDTH, MAP_HEIGHT, 
-							   "./terminal16x16.png", 0, 0x000000ff,
-							   render_game_map_view);
+							   tileset, 0, bgColor,
+							   colorize, render_game_map_view);
 	list_insert_after(igViews, NULL, mapView);
 
 	UIRect statsRect = {0, (16 * MAP_HEIGHT), (16 * STATS_WIDTH), (16 * STATS_HEIGHT)};
 	UIView *statsView = view_new(statsRect, STATS_WIDTH, STATS_HEIGHT,
 								 "./terminal16x16.png", 0, 0x000000ff,
-								 render_stats_view);
+								 true, render_stats_view);
 	list_insert_after(igViews, NULL, statsView);
 
 	UIRect logRect = {(16 * 20), (16 * MAP_HEIGHT), (16 * LOG_WIDTH), (16 * LOG_HEIGHT)};
 	UIView *logView = view_new(logRect, LOG_WIDTH, LOG_HEIGHT,
 							   "./terminal16x16.png", 0, 0x000000ff,
-							   render_message_log_view);
+							   true, render_message_log_view);
 	list_insert_after(igViews, NULL, logView);
 
 	UIScreen *inGameScreen = calloc(1, sizeof(UIScreen));
@@ -74,32 +86,28 @@ render_game_map_view(Console *console)
 		}
 	}
 
-	ListElement *e = list_head(visibilityComps);
-	while (e != NULL) {
-		Visibility *vis = (Visibility *)list_data(e);
-		Position *p = (Position *)game_object_get_component(&gameObjects[vis->objectId], COMP_POSITION);
-		if (p != NULL) {
-			if (fovMap[p->x][p->y] > 0) {
-				vis->hasBeenSeen = true;
-				// Don't render if we've already written something to to this cell at a higher layer
-				if (p->layer > layerRendered[p->x][p->y]) {
+	// Walk the visible element list for each layer, from ground to top
+	for (int layer = LAYER_GROUND; layer <= LAYER_TOP; layer++) {
+		ListElement *e = list_head(visibilityComps);
+		while (e != NULL) {
+			Visibility *vis = (Visibility *)list_data(e);
+			Position *p = (Position *)game_object_get_component(&gameObjects[vis->objectId], COMP_POSITION);
+			if (p != NULL && p->layer == layer) {
+				if (fovMap[p->x][p->y] > 0) {
+					vis->hasBeenSeen = true;
 					console_put_char_at(console, vis->glyph, p->x, p->y, vis->fgColor, vis->bgColor);
 					layerRendered[p->x][p->y] = p->layer;
-				}
 
-			} else if (vis->visibleOutsideFOV && vis->hasBeenSeen) {
-				u32 fullColor = vis->fgColor;
-				u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
-				// Don't render if we've already written something to to this cell at a higher layer
-				if (p->layer > layerRendered[p->x][p->y]) {
+				} else if (vis->visibleOutsideFOV && vis->hasBeenSeen) {
+					u32 fullColor = vis->fgColor;
+					u32 fadedColor = COLOR_FROM_RGBA(RED(fullColor), GREEN(fullColor), BLUE(fullColor), 0x77);
 					console_put_char_at(console, vis->glyph, p->x, p->y, fadedColor, 0x000000FF);
 					layerRendered[p->x][p->y] = p->layer;
 				}
 			}
+			e = list_next(e);
 		}
-		e = list_next(e);
 	}
-
 }
 
 internal void 
@@ -265,7 +273,7 @@ show_inventory_overlay(UIScreen *screen)
 		UIRect overlayRect = {(16 * INVENTORY_LEFT), (16 * INVENTORY_TOP), (16 * INVENTORY_WIDTH), (16 * INVENTORY_HEIGHT)};
 		inventoryView = view_new(overlayRect, INVENTORY_WIDTH, INVENTORY_HEIGHT, 
 								   "./terminal16x16.png", 0, 0x000000ff,
-								   render_inventory_view);
+								   true, render_inventory_view);
 		list_insert_after(screen->views, list_tail(screen->views), inventoryView);
 	}
 }

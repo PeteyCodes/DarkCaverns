@@ -29,13 +29,13 @@ screen_show_win_game()
 	UIRect infoRect = {(16 * WIN_INFO_LEFT), (16 * WIN_INFO_TOP), (16 * WIN_INFO_WIDTH), (16 * WIN_INFO_HEIGHT)};
 	UIView *infoView = view_new(infoRect, WIN_INFO_WIDTH, WIN_INFO_HEIGHT,
 								 "./terminal16x16.png", 0, 0x00000000, 
-                                 render_win_info_view);
+                                 true, render_win_info_view);
 	list_insert_after(views, NULL, infoView);
 
 	UIRect bgRect = {0, 0, (16 * BG_WIDTH), (16 * BG_HEIGHT)};
 	UIView *bgView = view_new(bgRect, BG_WIDTH, BG_HEIGHT, 
 							   "./terminal16x16.png", 0, 0x000000ff,
-                               render_win_bg_view);
+                               true, render_win_bg_view);
 	list_insert_after(views, NULL, bgView);
 
 	UIScreen *winScreen = calloc(1, sizeof(UIScreen));

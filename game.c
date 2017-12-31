@@ -854,7 +854,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	if (levelToGenerate == 21) {
 		game_over();
 		ui_set_active_screen(screen_show_win_game());
-		return;
+		return NULL;
 	}
 
 	// Generate a level map into the world state
@@ -941,7 +941,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	for (i32 i = 0; i < GEMS_PER_LEVEL; i++) {
 		GameObject *gem = game_object_create();
 		Point ptGem = level_get_open_point(mapCells);
-		Position gemPos = {.objectId = gem->id, .x = ptGem.x, .y = ptGem.y, .layer = LAYER_GROUND};
+		Position gemPos = {.objectId = gem->id, .x = ptGem.x, .y = ptGem.y, .layer = LAYER_MID};
 		game_object_update_component(gem, COMP_POSITION, &gemPos);
 		Visibility vis = {.objectId = gem->id, .glyph = 4, .fgColor = 0x753aabff, .bgColor = 0x00000000, .visibleOutsideFOV = false, .name="Gem"};
 		game_object_update_component(gem, COMP_VISIBILITY, &vis);
@@ -956,7 +956,7 @@ DungeonLevel * level_init(i32 levelToGenerate, GameObject *player) {
 	// Place a staircase in a random position in the level
 	GameObject *stairs = game_object_create();
 	Point ptStairs = level_get_open_point(mapCells);
-	Position stairPos = {.objectId = stairs->id, .x = ptStairs.x, .y = ptStairs.y, .layer = LAYER_GROUND};
+	Position stairPos = {.objectId = stairs->id, .x = ptStairs.x, .y = ptStairs.y, .layer = LAYER_MID};
 	game_object_update_component(stairs, COMP_POSITION, &stairPos);
 	if (levelToGenerate < 20) {
 		Visibility vis = {.objectId = stairs->id, .glyph = '>', .fgColor = 0xffd700ff, .bgColor = 0x00000000, .visibleOutsideFOV = true, .name="Stairs"};
@@ -1263,6 +1263,7 @@ void health_check_death(GameObject *go) {
 			String_Destroy(msg);
 			game_over();
 			ui_set_active_screen(screen_show_endgame());
+			currentlyInGame = false;			
 		
 		} else {
 
