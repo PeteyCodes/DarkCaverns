@@ -5,6 +5,9 @@
     Started: 1/28/2017
 */
 
+#include "ui.h"
+#include "util.h"
+
 
 // Include the STB image library - only the PNG support
 #define STB_IMAGE_IMPLEMENTATION
@@ -12,200 +15,12 @@
 #include "stb_image.h"
 
 
-// Helper macros for working with pixel colors
-#define RED(c) ((c & 0xff000000) >> 24)
-#define GREEN(c) ((c & 0x00ff0000) >> 16)
-#define BLUE(c) ((c & 0x0000ff00) >> 8)
-#define ALPHA(c) (c & 0xff)
-
-#define COLOR_FROM_RGBA(r, g, b, a) ((r << 24) | (g << 16) | (b << 8) | a)
-
 #define SWAP_U32(x) (((x) >> 24) | (((x) & 0x00ff0000) >> 8) | (((x) & 0x0000ff00) << 8) | ((x) << 24))
 
 
-/* Console Helper Types */
-
-typedef unsigned char asciiChar;
-typedef SDL_Rect UIRect;
-
-typedef struct {
-    asciiChar glyph;
-    u32 fgColor;
-    u32 bgColor;
-} ConsoleCell;
-
-typedef struct {
-    u32 *atlas;
-    u32 atlasWidth;
-    u32 atlasHeight;
-    u32 charWidth;
-    u32 charHeight;
-    asciiChar firstCharInAtlas;
-
-    // TODO: Consider chopping the atlas into BitmapImages for each cell
-    // TODO: This will optimize the ASCIIfy routine, and may even help with rendering?
-
-} ConsoleFont;
-
-typedef struct {
-    u32 *pixels;      // in-memory representation of the screen pixels
-    u32 width;
-    u32 height;
-    u32 rowCount;
-    u32 colCount;
-    u32 cellWidth;
-    u32 cellHeight;
-    u32 bgColor;
-    bool colorize;
-    ConsoleFont *font;
-    ConsoleCell *cells;
-} Console;
-
-
-/* Image Types */
-typedef struct {
-    u32 *pixels;
-    u32 width;
-    u32 height;    
-} BitmapImage;
-
-typedef struct {
-    ConsoleCell *cells;
-    u32 rows;
-    u32 cols;
-} AsciiImage;
-
-
-/* UI Types */
-struct UIScreen;
-typedef struct UIScreen UIScreen;
-
-typedef void (*UIRenderFunction)(Console *);
-typedef void (*UIEventHandler)(struct UIScreen *, SDL_Event);
-
-typedef struct {
-    Console *console;
-    UIRect *pixelRect;
-    UIRenderFunction render;
-} UIView;
-
-struct UIScreen {
-    List *views;
-    UIView *activeView;
-    UIEventHandler handle_event;
-};
-
-
 /* UI State */
-global_variable UIScreen *activeScreen = NULL;
-global_variable bool asciiMode = true;
-
-
-/* 
- *************************************************************************
- ***************************** Interface ********************************* 
- *************************************************************************
- */
-
-/* UI Functions */
-
-internal UIScreen *
-ui_get_active_screen();
-
-internal void 
-ui_set_active_screen(UIScreen *screen);
-
-
-internal void 
-view_destroy(UIView *view);
-
-internal UIView * 
-view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY, 
-         char *fontFile, asciiChar firstCharInAtlas, u32 bgColor,
-         bool colorize, UIRenderFunction renderFn);
-
-internal void 
-view_draw_rect(Console *console, UIRect *rect, u32 color, 
-            i32 borderWidth, u32 borderColor);
-
-internal void
-view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY);
-
-internal void
-view_draw_ascii_image_at(Console *console, AsciiImage *image, i32 cellX, i32 cellY);
-
-
-/* Console Functions */
-
-internal void 
-console_clear(Console *con);
-
-internal void
-console_destroy(Console *con);
-
-internal Console *
-console_new(i32 width, i32 height, i32 rowCount, i32 colCount, u32 bgColor, bool colorize);
-
-internal void 
-console_put_char_at(Console *con, asciiChar c, 
-                    i32 cellX, i32 cellY,
-                    u32 fgColor, u32 bgColor);
-
-internal void 
-console_put_string_at(Console *con, char *string, 
-                      i32 x, i32 y,
-                      u32 fgColor, u32 bgColor);
-
-internal void
-console_put_string_in_rect(Console *con, char *string,
-                           UIRect rect, bool wrap, 
-                           u32 fgColor, u32 bgColor);
-
-internal void 
-console_set_bitmap_font(Console *con, char *filename, 
-                        asciiChar firstCharInAtlas,
-                        i32 charWidth, i32 charHeight);
-
-
-/* Image Functions */
-
-internal AsciiImage*
-asciify_bitmap(Console *con, BitmapImage *image);
-
-internal BitmapImage*
-image_load_from_file(char *filename);
-
-internal BitmapImage *
-image_slice(BitmapImage *img, i32 rows, i32 cols);
-
-internal void 
-image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor);
-
-internal BitmapImage *
-image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor);
-
-internal asciiChar
-image_match_glyph(Console *console, BitmapImage *maskImage);
-
-
-/* Utility Functions */
-
-internal inline u32
-ui_colorize_pixel(u32 dest, u32 src); 
-
-internal void
-ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
-           u32 *srcPixels, UIRect *srcRect, u32 srcPixelsPerRow,
-           bool colorize, u32 *newColor);
-
-internal void
-ui_fill(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color);
-
-internal void
-ui_fill_blend(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color);
-
-internal UIRect 
-rect_get_for_glyph(asciiChar c, ConsoleFont *font);
+UIScreen *activeScreen = NULL;
+bool asciiMode = true;
 
 
 /* 
@@ -214,12 +29,12 @@ rect_get_for_glyph(asciiChar c, ConsoleFont *font);
  ******************************************************************************
  */
 
-internal UIScreen *
+UIScreen *
 ui_get_active_screen() {
     return activeScreen;
 }
 
-internal void 
+void 
 ui_set_active_screen(UIScreen *screen) {
     if (activeScreen != NULL) { free(activeScreen); }
     activeScreen = screen;
@@ -227,13 +42,13 @@ ui_set_active_screen(UIScreen *screen) {
 
 /* Console Function Implementation */
 
-internal void 
+void 
 console_clear(Console *con) {
     UIRect r = {0, 0, con->width, con->height};
     ui_fill(con->pixels, con->width, &r, con->bgColor);
 }
 
-internal Console *
+Console *
 console_new(i32 width, i32 height, 
             i32 rowCount, i32 colCount,
             u32 bgColor, bool colorize) {
@@ -255,14 +70,14 @@ console_new(i32 width, i32 height,
     return con;
 }
 
-internal void
+void
 console_destroy(Console *con) {
     if (con->pixels) { free(con->pixels); }
     if (con->cells) { free(con->cells); }
     if (con) { free(con); }
 }
 
-internal void 
+void 
 console_put_char_at(Console *con, asciiChar c, 
                     i32 cellX, i32 cellY,
                     u32 fgColor, u32 bgColor) {
@@ -281,7 +96,7 @@ console_put_char_at(Console *con, asciiChar c,
                 con->colorize, &fgColor);
 }
 
-internal void 
+void 
 console_put_string_at(Console *con, char *string, 
                       i32 x, i32 y,
                       u32 fgColor, u32 bgColor) {
@@ -291,7 +106,7 @@ console_put_string_at(Console *con, char *string,
     }
 }
 
-internal void
+void
 console_put_string_in_rect(Console *con, char *string,
                            UIRect rect, bool wrap, 
                            u32 fgColor, u32 bgColor) {
@@ -321,7 +136,7 @@ console_put_string_in_rect(Console *con, char *string,
     }
 }
 
-internal void 
+void 
 console_set_bitmap_font(Console *con, char *filename, 
                         asciiChar firstCharInAtlas,
                         i32 charWidth, i32 charHeight) {
@@ -373,7 +188,7 @@ console_set_bitmap_font(Console *con, char *filename,
 
 /* Image Functions */
 
-internal AsciiImage*
+AsciiImage*
 asciify_bitmap(Console *con, BitmapImage *image) {
     assert(image->height % con->cellHeight == 0);
     assert(image->width % con->cellWidth == 0);
@@ -441,7 +256,7 @@ asciify_bitmap(Console *con, BitmapImage *image) {
     return asciiImg;
 }
 
-internal BitmapImage *
+BitmapImage *
 image_slice(BitmapImage *img, i32 rows, i32 cols) {
     // Slice the given image into a 2D array of image cells
     i32 cellWidth = img->width / cols;
@@ -464,7 +279,7 @@ image_slice(BitmapImage *img, i32 rows, i32 cols) {
     return cells;
 }
 
-internal u32
+u32
 rgbdist(u32 color1, u32 color2) {
     i32 dr = RED(color1) - RED(color2);
     i32 dg = GREEN(color1) - GREEN(color2);
@@ -473,7 +288,7 @@ rgbdist(u32 color1, u32 color2) {
     return dr*dr + dg*dg + db*db;    
 }
 
-internal bool
+bool
 colors_are_distinct(u32 color1, u32 color2) {
     if (rgbdist(color1, color2) > 2000) {
         return true;
@@ -481,7 +296,7 @@ colors_are_distinct(u32 color1, u32 color2) {
     return false;
 }
 
-internal void 
+void 
 image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor) {
     // Determine primary and secondary colors for the given image.
     // The colors should be distinct enough to be distiguishable.
@@ -549,7 +364,7 @@ image_analyze_colors(BitmapImage *image, u32 *primaryColor, u32 *secondaryColor)
     free(counts);
 }
 
-internal BitmapImage*
+BitmapImage*
 image_load_from_file(char *filename) {
     // Load the image data
     int imgWidth, imgHeight, numComponents;
@@ -580,7 +395,7 @@ image_load_from_file(char *filename) {
     return bmi;
 }
 
-internal BitmapImage *
+BitmapImage *
 image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor) 
 {
     // Create a "1-bit" version of the given image
@@ -603,10 +418,9 @@ image_mask_create(BitmapImage *origImage, u32 primaryColor, u32 secondaryColor)
     return maskImage;
 }
 
-internal asciiChar
+asciiChar
 image_match_glyph(Console *console, BitmapImage *maskImage) {
     ConsoleFont *font = console->font;
-    u32 fontCols = font->atlasWidth / font->charWidth;
 
     i32 matchCount = 0;
     asciiChar bestMatch = 0;
@@ -646,7 +460,7 @@ image_match_glyph(Console *console, BitmapImage *maskImage) {
 
 /* UI Function Implementation */
 
-internal UIView * 
+UIView * 
 view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY, 
          char *fontFile, asciiChar firstCharInAtlas, u32 bgColor,
          bool colorize, UIRenderFunction renderFn) {
@@ -669,7 +483,7 @@ view_new(UIRect pixelRect, u32 cellCountX, u32 cellCountY,
     return view;
 }
 
-internal void 
+void 
 view_destroy(UIView *view) {
     if (view) {
         free(view->pixelRect);
@@ -680,7 +494,7 @@ view_destroy(UIView *view) {
 
 /* UI Utility Functions **/
 
-internal void 
+void 
 view_draw_rect(Console *console, UIRect *rect, u32 color, 
                i32 borderWidth, u32 borderColor)
 {
@@ -727,7 +541,7 @@ view_draw_rect(Console *console, UIRect *rect, u32 color,
     }
 }
 
-internal void
+void
 view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY) {
     // Loop through all the pixels in the bitmap, one row at a time and write them into 
     // the console's pixel buffer at the proper location.
@@ -739,7 +553,7 @@ view_draw_image_at(Console *console, BitmapImage *image, i32 cellX, i32 cellY) {
     }
 }
 
-internal void
+void
 view_draw_ascii_image_at(Console *console, AsciiImage *image, i32 cellX, i32 cellY)
 {
     for (u32 y = 0; y < image->rows; y++) {
@@ -752,7 +566,7 @@ view_draw_ascii_image_at(Console *console, AsciiImage *image, i32 cellX, i32 cel
 
 /* Utility Function Implementation */
 
-internal inline u32
+u32
 ui_colorize_pixel(u32 dest, u32 src) 
 {
     // Colorize the destination pixel using the source color
@@ -769,7 +583,7 @@ ui_colorize_pixel(u32 dest, u32 src)
     }
 }
 
-internal void
+void
 ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
               u32 *srcPixels, UIRect *srcRect, u32 srcPixelsPerRow,
               bool colorize, u32 *newColor)
@@ -835,7 +649,7 @@ ui_copy_blend(u32 *destPixels, UIRect *destRect, u32 destPixelsPerRow,
     }
 }
 
-internal void
+void
 ui_fill(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color)
 {
     u32 stopX = destRect->x + destRect->w;
@@ -848,7 +662,7 @@ ui_fill(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color)
     }
 }
 
-internal void
+void
 ui_fill_blend(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color)
 {
     // For each pixel in the destination rect, alpha blend the 
@@ -890,7 +704,7 @@ ui_fill_blend(u32 *pixels, u32 pixelsPerRow, UIRect *destRect, u32 color)
     }
 }
 
-internal UIRect 
+UIRect 
 rect_get_for_glyph(asciiChar c, ConsoleFont *font) {
     i32 idx = c - font->firstCharInAtlas;
     i32 charsPerRow = (font->atlasWidth / font->charWidth);

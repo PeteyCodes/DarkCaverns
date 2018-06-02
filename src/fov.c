@@ -2,17 +2,14 @@
 * fov.c
 */
 
-#define FOV_DISTANCE	10
+#include <assert.h>
+#include <stdlib.h>
 
-typedef struct {
-	u32 x, y;
-} FovCell;
+#include "ecs.h"
+#include "fov.h"
+#include "list.h"
 
-typedef struct {
-	float startSlope;
-	float endSlope;
-} Shadow;
-
+// Internal functions --
 
 void add_shadow(Shadow s);
 bool cell_blocks_sight(u32 x, u32 y);
@@ -25,8 +22,9 @@ internal Shadow knownShadows[10];
 internal u8 shadowCount = 0;
 
 
-internal void 
-fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
+// Public Interface --
+
+void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 
 	// Reset FOV to default state (hidden)
 	for (u32 x = 0; x < MAP_WIDTH; x++) {
@@ -97,6 +95,9 @@ fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]) {
 	}
 
 }
+
+
+// Private Methods --
 
 void add_shadow(Shadow s) {
 	knownShadows[shadowCount] = s;

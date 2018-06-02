@@ -12,6 +12,7 @@
         "sdl_events.h": "c",
         "sdl_rect.h": "c",
         "sdl_touch.h": "c",
-        "stb_image.h": "c"
+        "stb_image.h": "c",
+        "queue": "c"
     }
 }

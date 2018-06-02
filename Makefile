@@ -1,12 +1,27 @@
 # Makefile for building DarkCaverns on Unix systems
 
-all: clean dark
+target = dark
+src = $(wildcard src/*.c)
+obj = $(src:.c=.o)
 
-dark: dark.o
-	clang -L/usr/local/lib -lSDL2 dark.o -o dark
+INCLUDES = -I/usr/local/include
+CFLAGS = -c -Wall -Wextra -Wpedantic -DHAVE_ASPRINTF -g -O0 -std=gnu11
+LDFLAGS = -L/usr/local/lib -lSDL2
 
-dark.o:
-	clang -c -Wall -Wextra -Wpedantic -DHAVE_ASPRINTF -g -O0 -std=gnu11 -I/usr/local/include dark.c -o dark.o
+
+$(target): $(obj)
+	$(CC) -o $@ $^ $(LDFLAGS)
+
+%.o: %.c
+	$(CC) -o $@ $(CFLAGS) $(INCLUDES) $<
+
+all: clean $(target)
+.PHONY: clean
 
 clean:
-	-rm dark *.o
+	-rm $(target) 
+	-rm src/*.o
+
+run: clean $(target)
+	echo "Running..."
+	./$(target)

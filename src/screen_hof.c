@@ -8,22 +8,27 @@
 #define BG_WIDTH	80
 #define BG_HEIGHT	45
 
+#include "config.h"
+#include "game.h"
+#include "list.h"
+#include "screen_hof.h"
 
-internal void render_hof_bg_view(Console *console);
-internal void render_hof_view(Console *console);
-internal void handle_event_hof(UIScreen *activeScreen, SDL_Event event);
+
+// Internal Render Functions 
+void render_hof_bg_view(Console *console);
+void render_hof_view(Console *console);
 
 
 // Init / Show screen --
 
-internal UIScreen * 
+UIScreen * 
 screen_show_hof() 
 {
 	List *views = list_new(NULL);
 
 	UIRect bgRect = {0, 0, (16 * BG_WIDTH), (16 * BG_HEIGHT)};
 	UIView *bgView = view_new(bgRect, BG_WIDTH, BG_HEIGHT, 
-							   "./terminal16x16.png", 0, 0x000000ff, 
+							   "./assets/terminal16x16.png", 0, 0x000000ff, 
 							   true, render_hof_bg_view);
 	list_insert_after(views, NULL, bgView);
 
@@ -33,16 +38,40 @@ screen_show_hof()
 	hofScreen->handle_event = handle_event_hof;
 
 	if (hofConfig == NULL) {
-		hofConfig = config_file_parse("hof.cfg");
+		hofConfig = config_file_parse("./config/hof.cfg");
 	}
 
 	return hofScreen;
 }
 
 
-// Render Functions -- 
+// Event Handling --
 
-internal void
+void
+handle_event_hof(UIScreen *activeScreen, SDL_Event event) 
+{
+
+	if (event.type == SDL_KEYDOWN) {
+		SDL_Keycode key = event.key.keysym.sym;
+
+		switch (key) {
+			case SDLK_ESCAPE: {
+				ui_set_active_screen(screen_show_launch());
+			}
+			break;
+
+			default:
+				break;
+		}
+	}
+
+}
+
+
+
+// Internal Render Functions -- 
+
+void
 render_hof_entries(Console *console) {
 
 	// Loop through all HoF entries, extract the data into a formatted string, and write to screen
@@ -70,14 +99,14 @@ render_hof_entries(Console *console) {
 	}
 }
 
-internal void 
+void 
 render_hof_bg_view(Console *console)  
 {
 	// We should load and process the bg image only once, not on each render
 	local_persist BitmapImage *bgImage = NULL;
 	local_persist AsciiImage *aiImage = NULL;
 	if (bgImage == NULL) {
-		bgImage = image_load_from_file("./launch.png");
+		bgImage = image_load_from_file("./assets/launch.png");
 		aiImage = asciify_bitmap(console, bgImage);	
 	}
 
@@ -99,26 +128,4 @@ render_hof_bg_view(Console *console)
 
 }
 
-
-// Event Handling --
-
-internal void
-handle_event_hof(UIScreen *activeScreen, SDL_Event event) 
-{
-
-	if (event.type == SDL_KEYDOWN) {
-		SDL_Keycode key = event.key.keysym.sym;
-
-		switch (key) {
-			case SDLK_ESCAPE: {
-				ui_set_active_screen(screen_show_launch());
-			}
-			break;
-
-			default:
-				break;
-		}
-	}
-
-}
 

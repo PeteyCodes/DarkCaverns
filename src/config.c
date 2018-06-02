@@ -2,31 +2,11 @@
  * config.c
  */
 
-/*
-Config file format:
-[ENTITY_NAME]
-Key=Value
- .
- .
- .
-*/
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
-#define CONFIG_MAX_LINE_LEN	256
-
-typedef struct {
-	char *key;
-	char *value;
-} ConfigKeyValuePair;
-
-typedef struct {
-	char *name;
-	List *keyValuePairs;
-} ConfigEntity;
-
-typedef struct {
-	List *entities;
-} Config;
-
+#include "config.h"
 
 // Parse the given config file into an in-memory representation
 Config * config_file_parse(char * filename) {

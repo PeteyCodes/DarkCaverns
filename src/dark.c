@@ -2,60 +2,20 @@
 * dark.c - Dark Caverns Main Game Loop
 */
 
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+#include "dark.h"
+#include "game.h"
+#include "list.h"
+#include "screen_launch.h"
+#include "screen_in_game.h"
+#include "screen_win_game.h"
+#include "typedefs.h"
+#include "ui.h"
 
-#include <SDL2/SDL.h>
-
-#define SCREEN_WIDTH	1280
-#define SCREEN_HEIGHT	720
-
-#define NUM_COLS		80
-#define NUM_ROWS 		45
 
 #define FPS_LIMIT		20
 
 
-#include <stdbool.h>
-#include <stdint.h>
-
-typedef uint8_t		u8;
-typedef uint32_t	u32;
-typedef uint64_t	u64;
-typedef int8_t		i8;
-typedef int32_t		i32;
-typedef int64_t		i64;
-
-
-void quit_game();
-
-
-#define internal static
-#define local_persist static
-#define global_variable static
-
-#include "util.c"
-#include "String.c"
-#include "list.c"
-#include "config.c"
-// #define HASHMAP_IMPLEMENTATION
-// #include "hashmap.h"
-#include "ui.c"
-#include "map.c"
-#include "game.c"
-#include "fov.c"
-
-// Screen files
-#include "screen_in_game.c"
-#include "screen_launch.c"
-#include "screen_hof.c"
-#include "screen_end_game.c"
-#include "screen_win_game.c"
-
-
-internal void 
+void 
 render_screen(SDL_Renderer *renderer, 
 				  SDL_Texture *screenTexture, 
 				  UIScreen *screen) 
@@ -76,10 +36,6 @@ render_screen(SDL_Renderer *renderer,
 	SDL_RenderPresent(renderer);
 }
 
-global_variable bool gameIsRunning = true;
-void quit_game() {
-	gameIsRunning = false;
-}
 
 int main() 
 {
@@ -116,7 +72,7 @@ int main()
 			frameStart = SDL_GetTicks();
 
 			if (event.type == SDL_QUIT) {
-				quit_game(); 
+				game_quit(); 
 				break;
 			}
 

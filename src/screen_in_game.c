@@ -5,6 +5,14 @@
     Started: 1/30/2017
 */
 
+#include "game.h"
+#include "list.h"
+#include "map.h"
+#include "screen_in_game.h"
+#include "String.h"
+#include "ui.h"
+
+
 #define STATS_WIDTH		20
 #define STATS_HEIGHT 	5
 
@@ -17,19 +25,19 @@
 #define INVENTORY_HEIGHT	30
 
 
-global_variable UIView *inventoryView = NULL;
-global_variable i32 highlightedIdx = 0;
+// Values needed by other modules 
+UIView *inventoryView = NULL;
+i32 highlightedIdx = 0;
 
 
-internal void render_game_map_view(Console *console);
-internal void render_message_log_view(Console *console);
-internal void render_stats_view(Console *console);
-internal void handle_event_in_game(UIScreen *activeScreen, SDL_Event event);
+void render_game_map_view(Console *console);
+void render_message_log_view(Console *console);
+void render_stats_view(Console *console);
 
 
 // Init / Show screen --
 
-internal UIScreen * 
+UIScreen * 
 screen_show_in_game() 
 {
 	List *igViews = list_new(NULL);
@@ -39,11 +47,11 @@ screen_show_in_game()
 	bool colorize = true;
 	u32 bgColor;
 	if (asciiMode) {
-		tileset = "./terminal16x16.png";
+		tileset = "./assets/terminal16x16.png";
 		colorize = true;
 		bgColor = 0x000000ff;
 	} else {
-		tileset = "./graphic16x16.png";
+		tileset = "./assets/graphic16x16.png";
 		colorize = false;
 		bgColor = 0x00000000;
 	}
@@ -54,13 +62,13 @@ screen_show_in_game()
 
 	UIRect statsRect = {0, (16 * MAP_HEIGHT), (16 * STATS_WIDTH), (16 * STATS_HEIGHT)};
 	UIView *statsView = view_new(statsRect, STATS_WIDTH, STATS_HEIGHT,
-								 "./terminal16x16.png", 0, 0x000000ff,
+								 "./assets/terminal16x16.png", 0, 0x000000ff,
 								 true, render_stats_view);
 	list_insert_after(igViews, NULL, statsView);
 
 	UIRect logRect = {(16 * 20), (16 * MAP_HEIGHT), (16 * LOG_WIDTH), (16 * LOG_HEIGHT)};
 	UIView *logView = view_new(logRect, LOG_WIDTH, LOG_HEIGHT,
-							   "./terminal16x16.png", 0, 0x000000ff,
+							   "./assets/terminal16x16.png", 0, 0x000000ff,
 							   true, render_message_log_view);
 	list_insert_after(igViews, NULL, logView);
 
@@ -75,7 +83,7 @@ screen_show_in_game()
 
 // Render Functions --
 
-internal void 
+void 
 render_game_map_view(Console *console) 
 {
 	// Setup layer render history  
@@ -110,7 +118,7 @@ render_game_map_view(Console *console)
 	}
 }
 
-internal void 
+void 
 render_inventory_view(Console *console) 
 {
 	UIRect rect = {0, 0, INVENTORY_WIDTH, INVENTORY_HEIGHT};
@@ -120,7 +128,7 @@ render_inventory_view(Console *console)
 	local_persist BitmapImage *bgImage = NULL;
 	local_persist AsciiImage *aiImage = NULL;
 	if (bgImage == NULL) {
-		bgImage = image_load_from_file("./scrollBackground.png");
+		bgImage = image_load_from_file("./assets/scrollBackground.png");
 		aiImage = asciify_bitmap(console, bgImage);	
 	}
 
@@ -173,7 +181,7 @@ render_inventory_view(Console *console)
 	console_put_string_at(console, i2, 5, 26, 0x333333ff, 0x00000000);
 }
 
-internal void 
+void 
 render_message_log_view(Console *console) 
 {
 
@@ -205,7 +213,7 @@ render_message_log_view(Console *console)
 	}
 }
 
-internal void 
+void 
 render_stats_view(Console *console) 
 {
 	
@@ -256,7 +264,7 @@ render_stats_view(Console *console)
 
 // Screen Functions
 
-internal void 
+void 
 hide_inventory_overlay(UIScreen *screen) 
 {
 	if (inventoryView != NULL) {
@@ -266,13 +274,13 @@ hide_inventory_overlay(UIScreen *screen)
 	}
 }
 
-internal void 
+void 
 show_inventory_overlay(UIScreen *screen) 
 {
 	if (inventoryView == NULL) {
 		UIRect overlayRect = {(16 * INVENTORY_LEFT), (16 * INVENTORY_TOP), (16 * INVENTORY_WIDTH), (16 * INVENTORY_HEIGHT)};
 		inventoryView = view_new(overlayRect, INVENTORY_WIDTH, INVENTORY_HEIGHT, 
-								   "./terminal16x16.png", 0, 0x000000ff,
+								   "./assets/terminal16x16.png", 0, 0x000000ff,
 								   true, render_inventory_view);
 		list_insert_after(screen->views, list_tail(screen->views), inventoryView);
 	}
@@ -281,7 +289,7 @@ show_inventory_overlay(UIScreen *screen)
 
 // Event Handling --
 
-internal void
+void
 handle_event_in_game(UIScreen *activeScreen, SDL_Event event) 
 {
 
@@ -500,7 +508,7 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 				if (inventoryView != NULL) {
 					hide_inventory_overlay(activeScreen);
 				} else {
-					quit_game();
+					game_quit();
 				}
 			}
 			break;

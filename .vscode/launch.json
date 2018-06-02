@@ -1,23 +1,25 @@
 {
     "version": "0.2.0",
     "configurations": [
-        {
-            "name": "C++ Launch (Windows)",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceRoot}/dark.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceRoot}",
-            "environment": [],
-            "externalConsole": false
+        { 
+            "name": "(lldb) Attach",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "dark",
+            "processId": "${command:pickProcess}",
+            "MIMode": "lldb"
         },
         {
-            "name": "C++ Attach (Windows)",
-            "type": "cppvsdbg",
-            "request": "attach",
-            "processId": "${command:pickProcess}"
+            "name": "(lldb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "dark",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": true,
+            "MIMode": "lldb"
         }
     ]
 }

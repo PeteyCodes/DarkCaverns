@@ -2,8 +2,14 @@
  * util.c - Miscellaneous utility fns
  */
 
-// Forward declares
-char * String_Create(const char *, ...);
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "typedefs.h"
+#include "util.h"
+#include "String.h"
 
 
 #define PREFIX_COUNT 10

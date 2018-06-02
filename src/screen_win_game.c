@@ -5,6 +5,11 @@
     Started: 12/3/2017
 */
 
+#include "game.h"
+#include "list.h"
+#include "screen_win_game.h"
+
+
 #define BG_WIDTH	80
 #define BG_HEIGHT	45
 
@@ -14,27 +19,27 @@
 #define WIN_INFO_HEIGHT 20
 
 
-internal void render_win_bg_view(Console *console);
-internal void render_win_info_view(Console *console);  
-internal void handle_event_win(UIScreen *activeScreen, SDL_Event event);
+// Internal render functions
+void render_win_bg_view(Console *console);
+void render_win_info_view(Console *console);  
 
 
 // Init / Show screen --
 
-internal UIScreen * 
+UIScreen * 
 screen_show_win_game() 
 {
 	List *views = list_new(NULL);
 
 	UIRect infoRect = {(16 * WIN_INFO_LEFT), (16 * WIN_INFO_TOP), (16 * WIN_INFO_WIDTH), (16 * WIN_INFO_HEIGHT)};
 	UIView *infoView = view_new(infoRect, WIN_INFO_WIDTH, WIN_INFO_HEIGHT,
-								 "./terminal16x16.png", 0, 0x00000000, 
+								 "./assets/terminal16x16.png", 0, 0x00000000, 
                                  true, render_win_info_view);
 	list_insert_after(views, NULL, infoView);
 
 	UIRect bgRect = {0, 0, (16 * BG_WIDTH), (16 * BG_HEIGHT)};
 	UIView *bgView = view_new(bgRect, BG_WIDTH, BG_HEIGHT, 
-							   "./terminal16x16.png", 0, 0x000000ff,
+							   "./assets/terminal16x16.png", 0, 0x000000ff,
                                true, render_win_bg_view);
 	list_insert_after(views, NULL, bgView);
 
@@ -47,16 +52,53 @@ screen_show_win_game()
 }
 
 
+// Event Handling --
+
+void
+handle_event_win(UIScreen *activeScreen, SDL_Event event) 
+{
+
+	if (event.type == SDL_KEYDOWN) {
+		SDL_Keycode key = event.key.keysym.sym;
+
+		switch (key) {
+			case SDLK_n: {
+				// Start a new game and transition to in-game screen
+				game_new();
+				ui_set_active_screen(screen_show_in_game());
+				currentlyInGame = true;
+			}
+			break;
+
+            case SDLK_h: {
+				// Show hall of fame / credits screen
+                ui_set_active_screen(screen_show_hof());
+            }
+            break;
+
+			case SDLK_ESCAPE: {
+				game_quit();
+			}
+			break;
+
+			default:
+				break;
+		}
+	}
+
+}
+
+
 // Render Functions -- 
 
-internal void 
+void 
 render_win_bg_view(Console *console)  
 {
 	// We should load and process the bg image only once, not on each render
 	local_persist BitmapImage *bgImage = NULL;
 	local_persist AsciiImage *aiImage = NULL;
 	if (bgImage == NULL) {
-		bgImage = image_load_from_file("./you_won.png");
+		bgImage = image_load_from_file("./assets/you_won.png");
 		aiImage = asciify_bitmap(console, bgImage);	
 	}
 
@@ -70,7 +112,7 @@ render_win_bg_view(Console *console)
 
 }
 
-internal void 
+void 
 render_win_info_view(Console *console)  
 {
 	// Stats recap
@@ -95,39 +137,4 @@ render_win_info_view(Console *console)
 }
 
 
-// Event Handling --
-
-internal void
-handle_event_win(UIScreen *activeScreen, SDL_Event event) 
-{
-
-	if (event.type == SDL_KEYDOWN) {
-		SDL_Keycode key = event.key.keysym.sym;
-
-		switch (key) {
-			case SDLK_n: {
-				// Start a new game and transition to in-game screen
-				game_new();
-				ui_set_active_screen(screen_show_in_game());
-				currentlyInGame = true;
-			}
-			break;
-
-            case SDLK_h: {
-				// Show hall of fame / credits screen
-                ui_set_active_screen(screen_show_hof());
-            }
-            break;
-
-			case SDLK_ESCAPE: {
-				quit_game();
-			}
-			break;
-
-			default:
-				break;
-		}
-	}
-
-}
 

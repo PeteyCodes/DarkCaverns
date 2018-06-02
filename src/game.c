@@ -4,182 +4,50 @@
 
 #include <time.h>
 
-#define UNUSED	-1
-
-#define LAYER_UNSET		0
-#define LAYER_GROUND	1
-#define LAYER_MID		2
-#define LAYER_AIR		3
-#define LAYER_TOP		4
-
-#define MONSTER_TYPE_COUNT	100
-#define ITEM_TYPE_COUNT		100
-#define MAX_DUNGEON_LEVEL	20
-#define GEMS_PER_LEVEL		5
-
-typedef enum {
-	COMP_POSITION = 0,
-	COMP_VISIBILITY,
-	COMP_PHYSICAL,
-	COMP_HEALTH,
-	COMP_MOVEMENT,
-	COMP_COMBAT,
-	COMP_EQUIPMENT,
-	COMP_TREASURE,
-	COMP_ANIMATION, 
-
-	/* Define other components above here */
-	COMPONENT_COUNT
-} GameComponentType;
+#include "config.h"
+#include "dark.h"
+#include "fov.h"
+#include "game.h"
+#include "list.h"
+#include "screen_end_game.h"
+#include "screen_win_game.h"
+#include "String.h"
+#include "ui.h"
+#include "util.h"
 
 
-/* Entity */
-typedef struct {
-	i32 id;
-	void *components[COMPONENT_COUNT];
-} GameObject;
-
-
-/* Components */
-typedef struct {
-	i32 objectId;
-	u8 x, y;	
-	u8 layer;				// 1 is bottom layer
-} Position;
-
-typedef struct {
-	i32 objectId;
-	asciiChar glyph;
-	u32 fgColor;
-	u32 bgColor;
-	bool hasBeenSeen;
-	bool visibleOutsideFOV;
-	char *name;
-} Visibility;
-
-typedef struct {
-	i32 objectId;
-	bool blocksMovement;
-	bool blocksSight;
-} Physical;
-
-typedef struct {
-	i32 objectId;
-	i32 speed;				// How many spaces the object can move when it moves.
-	i32 frequency;			// How often the object moves. 1=every tick, 2=every other tick, etc.
-	i32 ticksUntilNextMove;	// Countdown to next move. Moves when = 0.
-	Point destination;
-	bool hasDestination;
-	bool chasingPlayer;
-	i32 turnsSincePlayerSeen;
-} Movement;
-
-typedef struct {
-	i32 objectId;
-	i32 currentHP;
-	i32 maxHP;
-	i32 recoveryRate;		// HP recovered per tick.
-	i32 ticksUntilRemoval;	// Countdown to removal from world state
-} Health;
-
-typedef struct {
-	i32 objectId;
-	i32 toHit;				// chance to hit
-	i32 toHitModifier;
-	i32 attack;				// attack = damage inflicted per hit
-	i32 attackModifier;		// based on weapons/items
-	i32 defense;			// defense = damage absorbed before HP is affected
-	i32 defenseModifier;	// based on armor/items
-} Combat;
-
-typedef struct {
-	i32 objectId;
-	i32 quantity;
-	i32 weight;
-	i32 lifetime;			// turns until equipment degrades beyond use.
-	char *slot;
-	bool isEquipped;
-} Equipment;
-
-typedef struct {
-	i32 objectId;
-	i32 value;
-} Treasure;
-
-typedef struct {
-	i32 objectId;
-	i32 keyFrameInterval;
-	i32 ticksUntilKeyframe;
-	bool finished;
-	void (*keyframeAnimation)(u32);
-	u32 value1;
-} Animation;
-
-/* Level Support */
-
-typedef struct {
-	i32 level;
-	bool (*mapWalls)[MAP_HEIGHT];
-} DungeonLevel;
-
-
-/* Message Log */
-typedef struct {
-	char *msg;
-	u32 fgColor;
-} Message;
-
-
-/* Hall of Fame */
-typedef struct {
-	char *name;
-	i32 level;
-	i32 gems;
-	char *date;
-} HOFRecord;
+#define EQUIP_LIFETIME 500
 
 
 /* Game State */
-#define MAX_GO 	10000
-#define EQUIP_LIFETIME 500
 
-global_variable GameObject *player = NULL;
-global_variable char* playerName = NULL;
-global_variable GameObject gameObjects[MAX_GO];
-global_variable List *positionComps;
-global_variable List *visibilityComps;
-global_variable List *physicalComps;
-global_variable List *movementComps;
-global_variable List *healthComps;
-global_variable List *combatComps;
-global_variable List *equipmentComps;
-global_variable List *treasureComps;
-global_variable List *animationComps;
+bool gameIsRunning = true;
 
-global_variable List *carriedItems;
-global_variable i32 maxWeightAllowed = 20;
+char* playerName = NULL;
 
-global_variable i32 gemsFoundThisLevel = 0;
-global_variable i32 gemsFoundTotal = 0;
+List *carriedItems;
+i32 maxWeightAllowed = 20;
 
-global_variable bool currentlyInGame = false;
-global_variable	bool recalculateFOV = false;
-global_variable	bool playerTookTurn = false;
+i32 gemsFoundThisLevel = 0;
+i32 gemsFoundTotal = 0;
 
-global_variable	i32 currentLevelNumber;
-global_variable DungeonLevel *currentLevel;
-global_variable u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
-global_variable i32 (*targetMap)[MAP_HEIGHT] = NULL;
-global_variable List *goPositions[MAP_WIDTH][MAP_HEIGHT];
-global_variable Config *monsterConfig = NULL;
-global_variable i32 monsterProbability[MONSTER_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
-global_variable Config *itemConfig = NULL;
-global_variable i32 itemProbability[ITEM_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
-global_variable Config *levelConfig = NULL;
-global_variable i32 maxMonsters[MAX_DUNGEON_LEVEL];
-global_variable i32 maxItems[MAX_DUNGEON_LEVEL];
-global_variable List *messageLog = NULL;
-global_variable Config *hofConfig = NULL;
+bool currentlyInGame = false;
+bool recalculateFOV = false;
+bool playerTookTurn = false;
+
+i32 currentLevelNumber;
+DungeonLevel *currentLevel;
+u32 fovMap[MAP_WIDTH][MAP_HEIGHT];
+i32 (*targetMap)[MAP_HEIGHT] = NULL;
+Config *monsterConfig = NULL;
+i32 monsterProbability[MONSTER_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
+Config *itemConfig = NULL;
+i32 itemProbability[ITEM_TYPE_COUNT][MAX_DUNGEON_LEVEL];		// TODO: dynamically size this based on actual count of monsters in config file
+Config *levelConfig = NULL;
+i32 maxMonsters[MAX_DUNGEON_LEVEL];
+i32 maxItems[MAX_DUNGEON_LEVEL];
+List *messageLog = NULL;
+Config *hofConfig = NULL;
 
 
 /* Necessary function declarations */
@@ -187,10 +55,6 @@ global_variable Config *hofConfig = NULL;
 void add_message(char *msg, u32 color);
 void generate_target_map(i32 targetX, i32 targetY);
 void combat_attack(GameObject *attacker, GameObject *defender);
-internal void fov_calculate(u32 heroX, u32 heroY, u32 fovMap[][MAP_HEIGHT]);
-internal UIScreen * screen_show_endgame();
-internal UIScreen * screen_show_win_game();
-internal void game_over();
 void item_toggle_equip(GameObject *item);
 void animateGem(u32 gameObjectId);
 
@@ -284,9 +148,9 @@ void world_state_init() {
 	gemsFoundTotal = 0;
 
 	// Parse necessary config files into memory
-	monsterConfig = config_file_parse("monsters.cfg");
-	itemConfig = config_file_parse("items.cfg");
-	levelConfig = config_file_parse("levels.cfg");
+	monsterConfig = config_file_parse("./config/monsters.cfg");
+	itemConfig = config_file_parse("./config/items.cfg");
+	levelConfig = config_file_parse("./config/levels.cfg");
 
 	// Generate our monster appearance probability data
 	get_appearance_prob(monsterConfig, monsterProbability);
@@ -313,402 +177,6 @@ void world_state_init() {
 }
 
 
-/* Game Object Management */
-
-GameObject *game_object_create() {
-	// Find the next available object space
-	GameObject *go = NULL;
-	for (i32 i = 0; i < MAX_GO; i++) {
-		if (gameObjects[i].id == UNUSED) {
-			go = &gameObjects[i];
-			go->id = i;
-			break;
-		}
-	}
-
-	assert(go != NULL);		// Have we run out of game objects?
-
-	for (i32 i = 0; i < COMPONENT_COUNT; i++) {
-		go->components[i] = NULL;
-	}
-
-	return go;
-}
-
-void game_object_update_component(GameObject *obj, 
-							  GameComponentType comp,
-							  void *compData) {
-	assert(obj->id != UNUSED);
-
-	switch (comp) {
-		case COMP_POSITION: {
-			if (compData != NULL) {
-				Position *pos = obj->components[COMP_POSITION];
-				bool addedNew = false;
-				if (pos == NULL) {
-					pos = (Position *)calloc(1, sizeof(Position));
-					addedNew = true;
-				} else {
-					// Remove game obj from the position helper DS
-					List *ls = goPositions[pos->x][pos->y];
-					list_remove_element_with_data(ls, obj);
-				}
-				Position *posData = (Position *)compData;
-				pos->objectId = obj->id;
-				pos->x = posData->x;
-				pos->y = posData->y;
-				pos->layer = posData->layer;
-
-				// Only insert into world component list if we just allocated a new component
-				if (addedNew) {
-					list_insert_after(positionComps, NULL, pos);					
-				}
-	
-				obj->components[comp] = pos;
-
-				// Update our helper DS 
-				List *gos = goPositions[posData->x][posData->y];
-				if (gos == NULL) {
-					gos = list_new(free);
-					goPositions[posData->x][posData->y] = gos;
-				}
-				list_insert_after(gos, NULL, obj);
-
-			} else {
-				// Clear component 
-				Position *pos = obj->components[COMP_POSITION];
-				if (pos != NULL) {
-					list_remove_element_with_data(positionComps, pos);	
-				}
-				obj->components[comp] = NULL;
-
-				// Remove game obj from the position helper DS
-				List *ls = goPositions[pos->x][pos->y];
-				list_remove_element_with_data(ls, obj);
-			}
-
-			break;
-		}
-
-		case COMP_VISIBILITY: {
-			if (compData != NULL) {
-				Visibility *vis = obj->components[COMP_VISIBILITY];
-				bool addedNew = false;
-				if (vis == NULL)  {
-					vis = (Visibility *)calloc(1, sizeof(Visibility));
-					addedNew = true;
-				}
-				Visibility *visData = (Visibility *)compData;
-				vis->objectId = obj->id;
-				vis->glyph = visData->glyph;
-				vis->fgColor = visData->fgColor;
-				vis->bgColor = visData->bgColor;
-				vis->hasBeenSeen = visData->hasBeenSeen;
-				vis->visibleOutsideFOV = visData->visibleOutsideFOV;
-				if (visData->name != NULL) {
-					vis->name = calloc(strlen(visData->name) + 1, sizeof(char));
-					strcpy(vis->name, visData->name);
-				}
-
-				if (addedNew) {
-					list_insert_after(visibilityComps, NULL, vis);					
-				}
-	
-				obj->components[comp] = vis;
-
-			} else {
-				// Clear component 
-				Visibility *vis = obj->components[COMP_VISIBILITY];
-				if (vis != NULL) {
-					list_remove_element_with_data(visibilityComps, vis);				
-				}
-				obj->components[comp] = NULL;
-			}
-
-			break;
-		}
-
-		case COMP_PHYSICAL: {
-			if (compData != NULL) {
-				Physical *phys = obj->components[COMP_PHYSICAL];
-				bool addedNew = false;
-				if (phys == NULL) {
-					phys = (Physical *)calloc(1, sizeof(Physical));
-					addedNew = true;
-				}
-				Physical *physData = (Physical *)compData;
-				phys->objectId = obj->id;
-				phys->blocksSight = physData->blocksSight;
-				phys->blocksMovement = physData->blocksMovement;
-
-				if (addedNew) {
-					list_insert_after(physicalComps, NULL, phys);					
-				}
-				obj->components[comp] = phys;
-
-			} else {
-				// Clear component 
-				Physical *phys = obj->components[COMP_PHYSICAL];
-				if (phys != NULL) {
-					list_remove_element_with_data(physicalComps, phys);				
-				}
-				obj->components[comp] = NULL;
-			}
-
-			break;
-		}
-
-		case COMP_MOVEMENT: {
-			if (compData != NULL) {
-				Movement *mv = obj->components[COMP_MOVEMENT];
-				bool addedNew = false;
-				if (mv == NULL) {
-					mv = (Movement *)calloc(1, sizeof(Movement));
-					addedNew = true;
-				}
-				Movement *mvData = (Movement *)compData;
-				mv->objectId = obj->id;
-				mv->speed = mvData->speed;
-				mv->frequency = mvData->frequency;
-				mv->ticksUntilNextMove = mvData->ticksUntilNextMove;
-				mv->chasingPlayer = mvData->chasingPlayer;
-				mv->turnsSincePlayerSeen = mvData->turnsSincePlayerSeen;
-
-				if (addedNew) {
-					list_insert_after(movementComps, NULL, mv);				
-				}
-				obj->components[comp] = mv;
-
-			} else {
-				// Clear component 
-				Movement *mv = obj->components[COMP_MOVEMENT];
-				if (mv != NULL) {
-					list_remove_element_with_data(movementComps, mv);				
-				}
-				obj->components[comp] = NULL;				
-			}
-
-			break;
-		}
-
-		case COMP_HEALTH: {
-			if (compData != NULL) {
-				Health *hlth = obj->components[COMP_HEALTH];
-				bool addedNew = false;
-				if (hlth == NULL) {
-					hlth = (Health *)calloc(1, sizeof(Health));
-					addedNew = true;
-				}
-				Health *hlthData = (Health *)compData;
-				hlth->objectId = obj->id;
-				hlth->currentHP = hlthData->currentHP;
-				hlth->maxHP = hlthData->maxHP;
-				hlth->recoveryRate = hlthData->recoveryRate;
-				hlth->ticksUntilRemoval = hlthData->ticksUntilRemoval;
-
-				if (addedNew) {
-					list_insert_after(healthComps, NULL, hlth);				
-				}
-				obj->components[comp] = hlth;
-
-			} else {
-				// Clear component 
-				Health *h = obj->components[COMP_HEALTH];
-				if (h != NULL) {
-					list_remove_element_with_data(healthComps, h);				
-				}
-				obj->components[comp] = NULL;				
-			}
-
-			break;
-		}
-
-		case COMP_COMBAT: {
-			if (compData != NULL) {
-				Combat *com = obj->components[COMP_COMBAT];
-				bool addedNew = false;
-				if (com == NULL) {
-					com = (Combat *)calloc(1, sizeof(Combat));
-					addedNew = true;
-				}
-				Combat *combatData = (Combat *)compData;
-				com->objectId = obj->id;
-				com->toHit = combatData->toHit;
-				com->toHitModifier = combatData->toHitModifier;
-				com->attack = combatData->attack;
-				com->defense = combatData->defense;
-				com->attackModifier = combatData->attackModifier;
-				com->defenseModifier = combatData->defenseModifier;
-
-				if (addedNew) {
-					list_insert_after(combatComps, NULL, com);				
-				}
-				obj->components[comp] = com;
-				
-			} else {
-				// Clear component 
-				Combat *c = obj->components[COMP_COMBAT];
-				if (c != NULL) {
-					list_remove_element_with_data(combatComps, c);				
-				}
-				obj->components[comp] = NULL;				
-			}
-
-			break;
-		}
-
-		case COMP_EQUIPMENT: {
-			if (compData != NULL) {
-				Equipment *equip = obj->components[COMP_EQUIPMENT];
-				bool addedNew = false;
-				if (equip == NULL) {
-					equip = (Equipment *)calloc(1, sizeof(Equipment));
-					addedNew = true;
-				}
-
-				Equipment *equipData = (Equipment *)compData;
-				equip->objectId = obj->id;
-				equip->quantity = equipData->quantity;
-				equip->weight = equipData->weight;
-				equip->lifetime = equipData->lifetime;
-				if (equipData->slot != NULL) {
-					equip->slot = calloc(strlen(equipData->slot) + 1, sizeof(char));
-					strcpy(equip->slot, equipData->slot);
-				}
-				equip->isEquipped = equipData->isEquipped;
-
-				if (addedNew) {
-					list_insert_after(equipmentComps, NULL, equip);				
-				}
-				obj->components[comp] = equip;
-				
-			} else {
-				// Clear component 
-				Equipment *e = obj->components[COMP_EQUIPMENT];
-				if (e != NULL) {
-					list_remove_element_with_data(equipmentComps, e);				
-				}
-				obj->components[comp] = NULL;				
-			}
-
-			break;
-		}
-
-		case COMP_TREASURE: {
-			if (compData != NULL) {
-				Treasure *treas = obj->components[COMP_TREASURE];
-				bool addedNew = false;
-				if (treas == NULL) {
-					treas = (Treasure *)calloc(1, sizeof(Treasure));
-					addedNew = true;
-				}
-
-				Treasure *treasData = (Treasure *)compData;
-				treas->objectId = obj->id;
-				treas->value = treasData->value;
-
-				if (addedNew) {
-					list_insert_after(treasureComps, NULL, treas);				
-				}
-				obj->components[comp] = treas;
-				
-			} else {
-				// Clear component 
-				Treasure *t = obj->components[COMP_TREASURE];
-				if (t != NULL) {
-					list_remove_element_with_data(treasureComps, t);				
-				}
-				obj->components[comp] = NULL;				
-			}
-
-			break;
-		}
-
-		case COMP_ANIMATION: {
-			if (compData != NULL) {
-				Animation *anim = obj->components[COMP_ANIMATION];
-				bool addedNew = false;
-				if (anim == NULL) {
-					anim = (Animation *)calloc(1, sizeof(Animation));
-					addedNew = true;
-				}
-
-				Animation *animData = (Animation *)compData;
-				anim->objectId = obj->id;
-				anim->keyFrameInterval = animData->keyFrameInterval;
-				anim->ticksUntilKeyframe = animData->ticksUntilKeyframe;
-				anim->finished = animData->finished;
-				anim->keyframeAnimation = animData->keyframeAnimation;
-				anim->value1 = animData->value1;
-
-				if (addedNew) {
-					list_insert_after(animationComps, NULL, anim);				
-				}
-				obj->components[comp] = anim;
-				
-			} else {
-				// Clear component 
-				Animation *a = obj->components[COMP_ANIMATION];
-				if (a != NULL) {
-					list_remove_element_with_data(animationComps, a);				
-				}
-				obj->components[comp] = NULL;				
-			}
-
-			break;
-		}
-
-		default:
-			assert(1 == 0);
-	}
-
-}
-
-void game_object_destroy(GameObject *obj) {
-	ListElement *elementToRemove = list_search(positionComps, obj->components[COMP_POSITION]);
-	if (elementToRemove != NULL ) { list_remove(positionComps, elementToRemove); }
-
-	elementToRemove = list_search(visibilityComps, obj->components[COMP_VISIBILITY]);
-	if (elementToRemove != NULL ) { list_remove(visibilityComps, elementToRemove); }
-
-	elementToRemove = list_search(physicalComps, obj->components[COMP_PHYSICAL]);
-	if (elementToRemove != NULL ) { list_remove(physicalComps, elementToRemove); }
-
-	elementToRemove = list_search(movementComps, obj->components[COMP_MOVEMENT]);
-	if (elementToRemove != NULL ) { list_remove(movementComps, elementToRemove); }
-
-	elementToRemove = list_search(healthComps, obj->components[COMP_HEALTH]);
-	if (elementToRemove != NULL ) { list_remove(healthComps, elementToRemove); }
-
-	elementToRemove = list_search(combatComps, obj->components[COMP_COMBAT]);
-	if (elementToRemove != NULL ) { list_remove(combatComps, elementToRemove); }
-
-	elementToRemove = list_search(equipmentComps, obj->components[COMP_EQUIPMENT]);
-	if (elementToRemove != NULL ) { list_remove(equipmentComps, elementToRemove); }
-
-	elementToRemove = list_search(treasureComps, obj->components[COMP_TREASURE]);
-	if (elementToRemove != NULL ) { list_remove(treasureComps, elementToRemove); }
-
-	elementToRemove = list_search(animationComps, obj->components[COMP_ANIMATION]);
-	if (elementToRemove != NULL ) { list_remove(animationComps, elementToRemove); }
-
-	// TODO: Clean up other components used by this object
-
-	obj->id = UNUSED;
-	for (i32 i = 0; i < COMPONENT_COUNT; i++) {
-		obj->components[i] = NULL;
-	}
-}
-
-
-void *game_object_get_component(GameObject *obj, 
-								GameComponentType comp) {
-	return obj->components[comp];
-}
-
-List *game_objects_at_position(u32 x, u32 y) {
-	return goPositions[x][y];
-}
 
 
 /* Game objects */
@@ -1386,7 +854,6 @@ void combat_deal_damage(GameObject *attacker, GameObject *defender) {
 
 void combat_attack(GameObject *attacker, GameObject *defender) {
 	Combat *att = (Combat *)game_object_get_component(attacker, COMP_COMBAT);
-	Combat *def = (Combat *)game_object_get_component(defender, COMP_COMBAT);
 
 	i32 hitRoll = (rand() % 100) + 1;
 	i32 hitWindow = (att->toHit + att->toHitModifier);
@@ -1670,9 +1137,10 @@ void animation_update() {
 		if (anim->finished) {
 			// Animation is done - clean it up
 			ListElement *eToRemove = e;
-			e = list_prev(e);
+			e = list_prev(eToRemove);
 			GameObject go = gameObjects[anim->objectId];
 			game_object_update_component(&go, COMP_ANIMATION, NULL);
+			list_remove(animationComps, eToRemove);
 		}
 
 		anim->ticksUntilKeyframe -= 1;
@@ -1689,7 +1157,7 @@ void animation_update() {
 
 /* High-level Game Routines */
 
-internal void
+void
 game_new()
 {
 	// -- Start a brand new game --
@@ -1718,7 +1186,7 @@ game_new()
 	generate_target_map(playerPos->x, playerPos->y);
 }
 
-internal void
+void
 game_update() 
 {
 	// Have things move themselves around the dungeon if the player moved
@@ -1743,13 +1211,13 @@ game_update()
 	animation_update();
 }
 
-internal void
+void
 game_over() {
 	// Do endgame processing -- 
 
 	// Load the existing HoF data if necessary
 	if (hofConfig == NULL) {
-		hofConfig = config_file_parse("hof.cfg");
+		hofConfig = config_file_parse("./config/hof.cfg");
 	}
 
 	// Determine if current game makes the HoF
@@ -1818,8 +1286,12 @@ game_over() {
 	// If we updated the HoF, write the new data to file
 	if (hofUpdated) {
 		// Persist HoF to config file
-		config_file_write("hof.cfg", hofConfig);
+		config_file_write("./config/hof.cfg", hofConfig);
 	}
+}
+
+void game_quit() {
+	gameIsRunning = false;
 }
 
 
@@ -1834,7 +1306,6 @@ void animateGem(u32 gameObjectId) {
 	u32 oRed = 0x75;
 	u32 oGreen = 0x3a;
 	u32 oBlue = 0xab;
-	u32 oAlpha = 0xff;
 
 	// Get our game object
 	GameObject go = gameObjects[gameObjectId];
@@ -1868,7 +1339,7 @@ void animateGem(u32 gameObjectId) {
 		g -= 10;
 		b -= 10;
 		if (r < oRed || g < oGreen || b < oBlue) {
-			// We've hit "origina purple", so reverse course
+			// We've hit "original purple", so reverse course
 			anim->value1 = 0;
 			return;
 		}

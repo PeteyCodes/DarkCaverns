@@ -4,25 +4,15 @@
 * Functions and Types for map generation.
 */
 
-#define MAP_WIDTH	80
-#define MAP_HEIGHT	40
+#include <stdlib.h>
+#include <string.h>
+
+#include "map.h"
+#include "list.h"
+#include "ui.h"
 
 
-typedef struct {
-	i32 x, y;
-} Point;
-
-typedef struct {
-	Point start;
-	Point mid;
-	Point end;
-	i32 roomFrom;
-	i32 roomTo;
-	bool hasWaypoint;
-} Segment;
-
-
-/* Function Declarations */
+/* Internal Function Declarations */
 void map_carve_hallway_horz(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]);
 void map_carve_hallway_vert(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]);
 bool map_carve_room(u32 x, u32 y, u32 w, u32 h, bool (*mapCells)[MAP_HEIGHT]);
@@ -32,7 +22,7 @@ Point rect_random_point(UIRect rect);
 i32 room_containing_point(Point pt, UIRect *rooms, i32 roomCount);
 
 
-/* Map Management */
+// Public Interface -- 
 
 void map_generate(bool (*mapCells)[MAP_HEIGHT]) {
 	// Mark all the map cells as "filled"
@@ -126,6 +116,9 @@ void map_generate(bool (*mapCells)[MAP_HEIGHT]) {
 	// Clean up
 	list_destroy(hallways);
 }
+
+
+// Private Methods --
 
 void map_carve_hallway_horz(Point from, Point to, bool (*mapCells)[MAP_HEIGHT]) {
 	u32 first, last;

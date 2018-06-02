@@ -2,39 +2,9 @@
 * list.c
 */
 
-typedef struct ListElement_ {
-	void *data;
-	struct ListElement_ *prev;
-	struct ListElement_ *next;
-} ListElement;
+#include <stdlib.h>
 
-typedef struct {
-	u32 size;
-
-	void (*destroy)(void *data);
-
-	ListElement *head;
-	ListElement *tail;
-} List;
-
-
-/* 
-Returns the number of elements in the given list
-*/
-#define list_size(list) ((list)->size)
-
-/*
-Get the header or tail of the given list
-*/ 
-#define list_head(list) ((list)->head)
-#define list_tail(list) ((list)->tail)
-
-/*
-Access the data for the given element
-*/
-#define list_data(element) ((element)->data)
-#define list_next(element) ((element)->next)
-#define list_prev(element) ((element)->prev)
+#include "list.h"
 
 /*
 list_new creates a new List and must be called before the list can be used.
