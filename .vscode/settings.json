@@ -13,6 +13,7 @@
         "sdl_rect.h": "c",
         "sdl_touch.h": "c",
         "stb_image.h": "c",
-        "queue": "c"
+        "queue": "c",
+        "screen_win_game.h": "c"
     }
 }

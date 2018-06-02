@@ -505,20 +505,20 @@ view_draw_rect(Console *console, UIRect *rect, u32 color,
             if (borderWidth > 0) {               
                 // Sides
                 if ((x == rect->x) || (x == rect->x + rect->w - 1)) {
-                    c = (borderWidth == 1) ? 179 : 186;
+                    c = (borderWidth == 1) ? (char)179 : (char)186;
                 }
 
                 // Top
                 if (y == rect->y) {
                     if (x == rect->x) {
                         // Top left corner
-                        c = (borderWidth == 1) ? 218 : 201;
+                        c = (borderWidth == 1) ? (char)218 : (char)201;
                     } else if (x == rect->x + rect->w - 1) {
                         // Top right corner
-                        c = (borderWidth == 1) ? 191 : 187;
+                        c = (borderWidth == 1) ? (char)191 : (char)187;
                     } else {
                         // Top border
-                        c = (borderWidth == 1) ? 196 : 205;
+                        c = (borderWidth == 1) ? (char)196 : (char)205;
                     }
                 }
                 
@@ -526,13 +526,13 @@ view_draw_rect(Console *console, UIRect *rect, u32 color,
                 if (y == rect->y + rect->h - 1) {
                     if (x == rect->x) {
                         // Bottom left corner
-                        c = (borderWidth == 1) ? 192 : 200;
+                        c = (borderWidth == 1) ? (char)192 : (char)200;
                     } else if (x == rect->x + rect->w - 1) {
                         // Bottom right corner
-                        c = (borderWidth == 1) ? 217 : 188;
+                        c = (borderWidth == 1) ? (char)217 : (char)188;
                     } else {
                         // Bottom border
-                        c = (borderWidth == 1) ? 196 : 205;
+                        c = (borderWidth == 1) ? (char)196 : (char)205;
                     }
                 }
             }

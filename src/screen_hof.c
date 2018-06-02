@@ -12,6 +12,8 @@
 #include "game.h"
 #include "list.h"
 #include "screen_hof.h"
+#include "screen_launch.h"
+#include "String.h"
 
 
 // Internal Render Functions 

@@ -8,6 +8,7 @@
 #include "game.h"
 #include "list.h"
 #include "screen_hof.h"
+#include "screen_in_game.h"
 #include "screen_launch.h"
 
 

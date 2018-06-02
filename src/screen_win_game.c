@@ -7,7 +7,10 @@
 
 #include "game.h"
 #include "list.h"
+#include "screen_hof.h"
+#include "screen_in_game.h"
 #include "screen_win_game.h"
+#include "String.h"
 
 
 #define BG_WIDTH	80

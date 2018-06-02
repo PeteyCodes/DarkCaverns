@@ -357,7 +357,7 @@ handle_event_in_game(UIScreen *activeScreen, SDL_Event event)
 				if (inventoryView != NULL) {
 					// Handle for inventory view
 					highlightedIdx += 1;
-					if (highlightedIdx > list_size(carriedItems)-1) { highlightedIdx = list_size(carriedItems) - 1; }
+					if (highlightedIdx > (i32)(list_size(carriedItems))-1) { highlightedIdx = list_size(carriedItems) - 1; }
 					
 				} else {
 					// Handle for main in-game view
