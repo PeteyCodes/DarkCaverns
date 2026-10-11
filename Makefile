@@ -3,7 +3,7 @@
 all: clean dark
 
 dark: dark.o
-	clang -L/usr/local/lib -lSDL2 dark.o -o dark
+	clang -L/usr/local/lib -lSDL2 dark.o -o dark -lm
 
 dark.o:
 	clang -c -Wall -Wextra -Wpedantic -DHAVE_ASPRINTF -g -O0 -std=gnu11 -I/usr/local/include dark.c -o dark.o
